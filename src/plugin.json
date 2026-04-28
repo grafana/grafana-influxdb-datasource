@@ -2,7 +2,7 @@
   "type": "datasource",
   "name": "InfluxDB",
   "id": "influxdb",
-  "executable": "gpx_influxdb",
+  "executable": "gpx_grafana_influxdb_datasource",
   "category": "tsdb",
 
   "defaultMatchFormat": "regex values",
@@ -17,7 +17,7 @@
   },
 
   "info": {
-    "description": "Open source time series database",
+    "description": "Data source for InfluxDB, an open source time series database",
     "version": "%VERSION%",
     "updated": "%TODAY%",
     "author": {
@@ -28,8 +28,9 @@
       "small": "img/influxdb_logo.svg",
       "large": "img/influxdb_logo.svg"
     },
+    "keywords": ["influxdb", "influx", "tsdb", "datasource"],
     "links": [
-      { "name": "Raise issue", "url": "https://github.com/grafana/grafana/issues/new" },
+      { "name": "Raise issue", "url": "https://github.com/grafana/grafana-influxdb-datasource/issues/new" },
       { "name": "Documentation", "url": "https://grafana.com/docs/grafana/latest/datasources/influxdb/" }
     ]
   },
