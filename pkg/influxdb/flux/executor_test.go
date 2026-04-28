@@ -19,8 +19,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/models"
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/simplejson"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/models"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/simplejson"
 )
 
 func Pointer[T any](v T) *T { return &v }

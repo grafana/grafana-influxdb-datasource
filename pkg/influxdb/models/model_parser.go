@@ -7,11 +7,10 @@ import (
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/influxdata/influxql"
 
-	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/simplejson"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/simplejson"
 )
 
 var (

@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/models"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/models"
 )
 
 type FSQLTestSuite struct {

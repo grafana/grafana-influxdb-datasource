@@ -8,7 +8,7 @@ import (
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
 
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/models"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/models"
 )
 
 var (

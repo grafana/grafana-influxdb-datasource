@@ -11,9 +11,9 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/influxql/buffered"
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/influxql/querydata"
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/models"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/influxql/buffered"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/influxql/querydata"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/models"
 )
 
 // TEST_MODE=buffered RES_FORMAT=time_series go test -benchmem -run=^$ -memprofile buffered_mem.out -count=10 -bench ^BenchmarkParseJson github.com/grafana/grafana/pkg/tsdb/influxdb/influxql | tee buffered.txt

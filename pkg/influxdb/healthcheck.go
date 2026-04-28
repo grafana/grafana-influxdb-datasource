@@ -7,39 +7,34 @@ import (
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
 
-	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/flux"
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/fsql"
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/influxql"
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/models"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/flux"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/fsql"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/influxql"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/models"
 )
 
 const (
 	refID = "healthcheck"
 )
 
-func (s *Service) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult,
+func (ds *DataSource) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult,
 	error) {
 	logger := logger.FromContext(ctx)
-	dsInfo, err := s.getDSInfo(ctx, req.PluginContext)
-	if err != nil {
-		return getHealthCheckMessage(logger, "error getting datasource info", err)
-	}
 
-	if dsInfo == nil {
+	if ds.info == nil {
 		return getHealthCheckMessage(logger, "", errors.New("invalid datasource info received"))
 	}
 
-	switch dsInfo.Version {
+	switch ds.info.Version {
 	case influxVersionFlux:
-		return CheckFluxHealth(ctx, dsInfo, req)
+		return CheckFluxHealth(ctx, ds.info, req)
 	case influxVersionInfluxQL:
-		return CheckInfluxQLHealth(ctx, dsInfo, req)
+		return CheckInfluxQLHealth(ctx, ds.info, req)
 	case influxVersionSQL:
-		return CheckSQLHealth(ctx, dsInfo, req)
+		return CheckSQLHealth(ctx, ds.info, req)
 	default:
 		return getHealthCheckMessage(logger, "", errors.New("unknown influx version"))
 	}

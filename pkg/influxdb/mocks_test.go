@@ -2,18 +2,14 @@ package influxdb
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 
-	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/models"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
-
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/models"
 )
 
 type fakeHttpClientProvider struct {
@@ -39,46 +35,6 @@ func (p *fakeHttpClientProvider) GetTransport(opts ...httpclient.Options) (http.
 
 func (p *fakeHttpClientProvider) RoundTrip(req *http.Request) (*http.Response, error) {
 	return p.rt.RoundTrip(req)
-}
-
-type fakeInstance struct {
-	version          string
-	fakeRoundTripper RoundTripper
-}
-
-func (f *fakeInstance) Get(_ context.Context, _ backend.PluginContext) (instancemgmt.Instance, error) {
-	fp := &fakeHttpClientProvider{
-		opts: httpclient.Options{
-			Timeouts: &httpclient.DefaultTimeoutOptions,
-		},
-		res: &http.Response{
-			StatusCode: 200,
-			Body:       io.NopCloser(bytes.NewReader([]byte(`{}`))),
-		},
-		rt: f.fakeRoundTripper,
-	}
-
-	client, err := fp.New(httpclient.Options{})
-	if err != nil {
-		return nil, err
-	}
-
-	return &models.DatasourceInfo{
-		HTTPClient:    client,
-		Token:         "sometoken",
-		URL:           "https://awesome-influx.com",
-		DbName:        "testdb",
-		Version:       f.version,
-		HTTPMode:      "GET",
-		TimeInterval:  "10s",
-		DefaultBucket: "testbucket",
-		Organization:  "testorg",
-		MaxSeries:     2,
-	}, nil
-}
-
-func (f *fakeInstance) Do(_ context.Context, _ backend.PluginContext, _ instancemgmt.InstanceCallbackFunc) error {
-	return nil
 }
 
 type RoundTripper struct {
@@ -109,11 +65,32 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	return nil, errors.New("fake client not working as expected. If you got this error fix this method")
 }
 
-func GetMockService(version string, rt RoundTripper) *Service {
-	return &Service{
-		im: &fakeInstance{
-			version:          version,
-			fakeRoundTripper: rt,
+func GetMockDataSource(version string, rt RoundTripper) *DataSource {
+	fp := &fakeHttpClientProvider{
+		opts: httpclient.Options{
+			Timeouts: &httpclient.DefaultTimeoutOptions,
+		},
+		res: &http.Response{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewReader([]byte(`{}`))),
+		},
+		rt: rt,
+	}
+
+	client, _ := fp.New(httpclient.Options{})
+
+	return &DataSource{
+		info: &models.DatasourceInfo{
+			HTTPClient:    client,
+			Token:         "sometoken",
+			URL:           "https://awesome-influx.com",
+			DbName:        "testdb",
+			Version:       version,
+			HTTPMode:      "GET",
+			TimeInterval:  "10s",
+			DefaultBucket: "testbucket",
+			Organization:  "testorg",
+			MaxSeries:     2,
 		},
 	}
 }

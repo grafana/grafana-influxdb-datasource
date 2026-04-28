@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/models"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/models"
 )
 
 func TestParseString(t *testing.T) {

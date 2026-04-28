@@ -17,9 +17,9 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/config"
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/influxql/buffered"
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/influxql/querydata"
-	"github.com/grafana/grafana/pkg/tsdb/influxdb/models"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/influxql/buffered"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/influxql/querydata"
+	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/models"
 )
 
 const (
