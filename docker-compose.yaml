@@ -3,3 +3,20 @@ services:
     extends:
       file: .config/docker-compose-base.yaml
       service: grafana
+    environment:
+      # Grafana 13 enables splashScreen by default; the overlay blocks Playwright interactions.
+      GF_FEATURE_TOGGLES_splashScreen: 'false'
+    configs:
+      # Run the externalized plugin in place of the core InfluxDB plugin.
+      # Without as_external=true, DuplicatePluginIDValidation (pkg/services/pluginsintegration/pipeline/steps.go)
+      # drops the external plugin because the core one is already registered under id=influxdb.
+      # Env vars won't work here because Grafana only applies GF_PLUGIN_INFLUXDB_* overrides if
+      # [plugin.influxdb] already exists in defaults.ini — and it doesn't.
+      - source: grafana_custom_ini
+        target: /etc/grafana/grafana.ini
+
+configs:
+  grafana_custom_ini:
+    content: |
+      [plugin.influxdb]
+      as_external = true

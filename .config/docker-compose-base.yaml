@@ -19,13 +19,13 @@ services:
     cap_add:
       - SYS_PTRACE
     volumes:
-      - ../dist:/var/lib/grafana/plugins/grafana-influxdb-datasource
+      - ../dist:/var/lib/grafana/plugins/influxdb
       - ../provisioning:/etc/grafana/provisioning
-      - ..:/root/grafana-influxdb-datasource
+      - ..:/root/influxdb
 
     environment:
       NODE_ENV: development
-      GF_LOG_FILTERS: plugin.grafana-influxdb-datasource:debug
+      GF_LOG_FILTERS: plugin.influxdb:debug
       GF_LOG_LEVEL: debug
       GF_DATAPROXY_LOGGING: 1
-      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: grafana-influxdb-datasource
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: influxdb
