@@ -1,2 +1,2 @@
 const monaco = {};
-module.exports = monaco;
+export default monaco;
