@@ -1,5 +1,5 @@
 import { css } from '@emotion/css';
-import { useId, useMemo, type JSX } from 'react';
+import { useEffect, useId, useMemo, useState, type JSX } from 'react';
 
 import { type GrafanaTheme2 } from '@grafana/data';
 import { InlineLabel, SegmentSection, useStyles2 } from '@grafana/ui';
@@ -52,12 +52,22 @@ export const VisualInfluxQLEditor = (props: Props): JSX.Element => {
   const { datasource } = props;
   const { measurement, policy } = query;
 
-  const allTagKeys = useMemo(async () => {
-    const tagKeys = (await getTagKeys(datasource, measurement, policy)).map((tag) => `${tag}::tag`);
-
-    const fieldKeys = (await getFieldKeys(datasource, measurement || '', policy)).map((field) => `${field}::field`);
-
-    return new Set([...tagKeys, ...fieldKeys]);
+  const [allTagKeys, setAllTagKeys] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchKeys() {
+      const tagKeys = (await getTagKeys(datasource, measurement, policy)).map((tag) => `${tag}::tag`);
+      const fieldKeys = (await getFieldKeys(datasource, measurement || '', policy)).map((field) => `${field}::field`);
+      return new Set([...tagKeys, ...fieldKeys]);
+    }
+    fetchKeys().then((keys) => {
+      if (!cancelled) {
+        setAllTagKeys(keys);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [measurement, policy, datasource]);
 
   const selectLists = useMemo(() => {
@@ -76,7 +86,7 @@ export const VisualInfluxQLEditor = (props: Props): JSX.Element => {
   // is used in both memoized and un-memoized parts, so we have no choice
   const getMemoizedTagKeys = useMemo(
     () => async () => {
-      return [...(await allTagKeys)];
+      return [...allTagKeys];
     },
     [allTagKeys]
   );
@@ -116,9 +126,7 @@ export const VisualInfluxQLEditor = (props: Props): JSX.Element => {
           getPolicyOptions={() => withTemplateVariableOptions(getAllPolicies(datasource), wrapPure)}
           getMeasurementOptions={(filter) =>
             withTemplateVariableOptions(
-              allTagKeys.then((keys) =>
-                getAllMeasurements(datasource, filterTags(query.tags ?? [], keys), filter === '' ? undefined : filter)
-              ),
+              getAllMeasurements(datasource, filterTags(query.tags ?? [], allTagKeys), filter === '' ? undefined : filter),
               wrapRegex,
               filter
             )
@@ -134,7 +142,7 @@ export const VisualInfluxQLEditor = (props: Props): JSX.Element => {
           getTagKeyOptions={getMemoizedTagKeys}
           getTagValueOptions={(key) =>
             withTemplateVariableOptions(
-              allTagKeys.then((keys) => getTagValues(datasource, filterTags(query.tags ?? [], keys), key, measurement)),
+              getTagValues(datasource, filterTags(query.tags ?? [], allTagKeys), key, measurement),
               wrapRegex
             )
           }
