@@ -5,7 +5,7 @@ go 1.25.8
 require (
 	github.com/apache/arrow-go/v18 v18.5.2
 	github.com/google/go-cmp v0.7.0
-	github.com/grafana/dskit v0.0.0-20260423105331-de42b217b3c1
+	github.com/grafana/dskit v0.0.0-20260513101413-57dc7410e84a
 	github.com/grafana/grafana-plugin-sdk-go v0.292.0
 	github.com/influxdata/influxdb-client-go/v2 v2.14.0
 	github.com/influxdata/influxql v1.4.1
@@ -90,7 +90,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.10.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	go.yaml.in/yaml/v2 v2.4.3 // indirect
+	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90 // indirect
 	golang.org/x/mod v0.34.0 // indirect
 	golang.org/x/net v0.53.0 // indirect
