@@ -14,7 +14,7 @@ jobs:
           ref: main
           persist-credentials: false
       - name: Install Actions
-        run: npm install --production --prefix ./actions
+        run: npm install --production --ignore-scripts --allow-git=none --registry=https://registry.npmjs.org/ --prefix ./actions
       - name: Run Commands
         uses: ./actions/commands
         with:
