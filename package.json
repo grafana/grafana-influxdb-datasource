@@ -11,7 +11,7 @@
     "lint:fix": "npm run lint -- --fix && prettier --write --list-different .",
     "e2e": "playwright test",
     "server": "docker compose up --build",
-    "sign": "npx npx --yes --package @grafana/sign-plugin@3.2.2 sign-plugin"
+    "sign": "npx --yes --package @grafana/sign-plugin@3.2.2 sign-plugin"
   },
   "author": "Grafana",
   "license": "AGPL-3.0",
