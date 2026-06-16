@@ -11,14 +11,15 @@
     "lint:fix": "npm run lint -- --fix && prettier --write --list-different .",
     "e2e": "playwright test",
     "server": "docker compose up --build",
-    "sign": "npx --yes @grafana/sign-plugin@latest"
+    "sign": "sign-plugin"
   },
   "author": "Grafana",
   "license": "AGPL-3.0",
   "devDependencies": {
     "@grafana/e2e-selectors": "13.0.1",
     "@grafana/eslint-config": "^9.0.0",
-    "@grafana/plugin-e2e": "^3.6.0",
+    "@grafana/plugin-e2e": "^3.9.0",
+    "@grafana/sign-plugin": "^3.2.2",
     "@grafana/tsconfig": "^2.0.1",
     "@playwright/test": "^1.57.0",
     "@stylistic/eslint-plugin-ts": "^4.4.0",
@@ -32,7 +33,7 @@
     "@types/debounce-promise": "^3.1.9",
     "@types/jest": "30.0.0",
     "@types/node": "24.12.4",
-    "@types/react": "18.3.28",
+    "@types/react": "18.3.31",
     "@types/react-dom": "18.3.7",
     "@typescript-eslint/eslint-plugin": "^8.38.0",
     "@typescript-eslint/parser": "^8.38.0",
@@ -69,7 +70,8 @@
     "webpack-virtual-modules": "^0.6.2"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=24",
+    "npm": ">=11.12.1"
   },
   "dependencies": {
     "@emotion/css": "11.13.5",
@@ -87,5 +89,5 @@
     "react-use": "17.6.0",
     "rxjs": "7.8.2"
   },
-  "packageManager": "npm@11.6.1"
+  "packageManager": "npm@11.12.1"
 }
