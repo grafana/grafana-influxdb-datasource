@@ -3,8 +3,6 @@ on:
   issues:
     types: [labeled]
 
-permissions: {}
-
 jobs:
   main:
     runs-on: ubuntu-latest
