@@ -1,10 +1,9 @@
 {
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
     "extends": [
-        "github>grafana/grafana-renovate-config//presets/automerge"
+        "github>grafana/grafana-renovate-config//presets/data-sources/base"
     ],
     "platformAutomerge": true,
-    "minimumReleaseAge": "3 days",
     "packageRules": [
         {
             "description": "Disable minimum release age for Grafana owned npm packages (@grafana/*)",
