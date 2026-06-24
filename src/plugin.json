@@ -5,7 +5,6 @@
   "executable": "gpx_grafana_influxdb_datasource",
   "category": "tsdb",
 
-  "defaultMatchFormat": "regex values",
   "metrics": true,
   "logs": true,
   "annotations": true,
