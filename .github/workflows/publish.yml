@@ -13,6 +13,7 @@ on:
         type: choice
         options:
           - "dev"
+          - "ops"
       scope:
         description: Cloud will publish scoped only to Grafana Cloud, On Prem will publish with Universal scope. Please use Cloud unless emergency fix needed for On Prem customer.
         required: true
