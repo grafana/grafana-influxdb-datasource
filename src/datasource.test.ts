@@ -128,7 +128,9 @@ describe('interpolateQueryExpr', () => {
     expect(result).toBe(expectation);
   });
 
-  it('should return the escaped value if the value wrapped in regex without !~ or =~', () => {
+  it('should **not** escape the value when the surrounding slashes do not delimit a regex', () => {
+    // InfluxQL regexes only appear after `=~`, `!~` or FROM, or as a
+    // whole-field value, so `path /$tempVar/` is not a regex usage
     const value = '/special/path';
     const variableMock = queryBuilder().withId('tempVar').withName('tempVar').withMulti(false).build();
     const result = ds.interpolateQueryExpr(
@@ -136,8 +138,79 @@ describe('interpolateQueryExpr', () => {
       variableMock,
       'select atan(z/sqrt(3.14)), that where path /$tempVar/'
     );
-    const expectation = `\\/special\\/path`;
+    const expectation = `/special/path`;
     expect(result).toBe(expectation);
+  });
+
+  it('should not escape backend macros when the query mixes division and regexes', () => {
+    const rawQuery = `SELECT non_negative_derivative(LAST("sent")) / $__interval_ms FROM "eth_out" WHERE $timeFilter AND "mac_address" =~ /^$mac_address$/ GROUP BY time($__interval) fill(previous)`;
+    const intervalVar = queryBuilder().withId('__interval').withName('__interval').withMulti(false).build();
+    const intervalMsVar = queryBuilder().withId('__interval_ms').withName('__interval_ms').withMulti(false).build();
+    expect(ds.interpolateQueryExpr('$__interval', intervalVar, rawQuery)).toBe('$__interval');
+    expect(ds.interpolateQueryExpr('$__interval_ms', intervalMsVar, rawQuery)).toBe('$__interval_ms');
+  });
+
+  it('should still escape a variable used inside a regex when the query also contains a division', () => {
+    const rawQuery = `SELECT non_negative_derivative(LAST("sent")) / $__interval_ms FROM "eth_out" WHERE $timeFilter AND "mac_address" =~ /^$mac_address$/ GROUP BY time($__interval) fill(previous)`;
+    const macVar = queryBuilder().withId('mac_address').withName('mac_address').withMulti(false).build();
+    expect(ds.interpolateQueryExpr('host (eu/1)', macVar, rawQuery)).toBe('host \\(eu\\/1\\)');
+  });
+
+  it('should escape single-value variables used in query builder regex tag values', () => {
+    const variableMock = queryBuilder().withId('HPU').withName('HPU').withMulti(false).withIncludeAll(true).build();
+    const result = ds.interpolateQueryExpr('n/a', variableMock, '/^$HPU$/');
+    expect(result).toBe('n\\/a');
+  });
+
+  it('should pipe-join "All" values of a non-multi variable used in a regex tag value', () => {
+    const variableMock = queryBuilder().withId('Host').withName('Host').withMulti(false).withIncludeAll(true).build();
+    const result = ds.interpolateQueryExpr(['value1.domain.com', 'value2.domain.com'], variableMock, '/^$Host$/');
+    expect(result).toBe('(value1\\.domain\\.com|value2\\.domain\\.com)');
+  });
+
+  it('should escape regex-significant characters in chained variable queries', () => {
+    const variableMock = queryBuilder().withId('hostname').withName('hostname').withMulti(false).build();
+    const result = ds.interpolateQueryExpr(
+      'BÖRD 01 (test)',
+      variableMock,
+      'SHOW TAG VALUES WITH KEY = "service" WHERE hostname =~ /^$hostname$/'
+    );
+    expect(result).toBe('BÖRD 01 \\(test\\)');
+  });
+
+  it('should escape variables used in a FROM clause regex', () => {
+    const variableMock = queryBuilder().withId('m').withName('m').withMulti(false).build();
+    const result = ds.interpolateQueryExpr(
+      'cpu (avg)',
+      variableMock,
+      'SELECT mean("value") FROM /^$m$/ WHERE $timeFilter'
+    );
+    expect(result).toBe('cpu \\(avg\\)');
+  });
+
+  describe('in SQL mode', () => {
+    const dsSQL = getMockInfluxDS(getMockDSInstanceSettings({ version: InfluxVersion.SQL }), templateSrvStub);
+    const rawSql = `SELECT "time", "percentile50_ms" FROM "ping" WHERE ("host" = '$host' AND "url" = '$url')`;
+
+    it('should not regex-escape string values', () => {
+      const variableMock = queryBuilder().withId('url').withName('url').withMulti().build();
+      expect(dsSQL.interpolateQueryExpr('cloudflare-dns.com', variableMock, rawSql)).toBe('cloudflare-dns.com');
+    });
+
+    it('should interpolate a single-selection multi variable as a bare value', () => {
+      const variableMock = queryBuilder().withId('url').withName('url').withMulti().build();
+      expect(dsSQL.interpolateQueryExpr(['cloudflare-dns.com'], variableMock, rawSql)).toBe('cloudflare-dns.com');
+    });
+
+    it('should quote and comma-join multiple values for use with IN', () => {
+      const variableMock = queryBuilder().withId('City').withName('City').withMulti().build();
+      const result = dsSQL.interpolateQueryExpr(
+        ['Amsterdam', "s'Hertogenbosch"],
+        variableMock,
+        `SELECT * FROM "weather" WHERE "city" IN ($City)`
+      );
+      expect(result).toBe(`'Amsterdam', 's''Hertogenbosch'`);
+    });
   });
 
   it('should return the escaped value if the value wrapped in regex', () => {

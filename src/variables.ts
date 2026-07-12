@@ -1,7 +1,12 @@
 import { from, type Observable, of } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { CustomVariableSupport, type DataQueryRequest, type DataQueryResponse } from '@grafana/data';
+import {
+  CustomVariableSupport,
+  type DataQueryRequest,
+  type DataQueryResponse,
+  type QueryVariableModel,
+} from '@grafana/data';
 import { getTemplateSrv, type TemplateSrv } from '@grafana/runtime';
 
 import { InfluxVariableEditor } from './components/editor/variable/VariableQueryEditor';
@@ -30,7 +35,14 @@ export class InfluxVariableSupport extends CustomVariableSupport<InfluxDatasourc
       return of({ data: [] });
     }
 
-    const q = this.templateSrv.replace(query, request.scopedVars, this.datasource.interpolateQueryExpr);
+    // Bind the datasource and pass the query text so values used inside a
+    // regex (e.g. chained variables in `=~ /^$var$/`) get escaped
+    const q = this.templateSrv.replace(
+      query,
+      request.scopedVars,
+      (value: string | string[] = [], variable: QueryVariableModel) =>
+        this.datasource.interpolateQueryExpr(value, variable, query)
+    );
     const timeFilter = this.datasource.getTimeFilter({ rangeRaw: request.range.raw, timezone: request.timezone });
     const interpolated = q.replace('$timeFilter', timeFilter);
     const metricFindStream = from(

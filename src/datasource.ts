@@ -46,6 +46,33 @@ import ResponseParser from './response_parser';
 import { DEFAULT_POLICY, type InfluxOptions, type InfluxQuery, type InfluxVariableQuery, InfluxVersion } from './types';
 import { InfluxVariableSupport } from './variables';
 
+/**
+ * Decides whether a variable is referenced inside a regex literal in the
+ * given query text. InfluxQL and Flux regex literals only appear after the
+ * `=~` and `!~` operators or in a FROM clause, or the interpolated field is
+ * itself a lone regex (a query-builder tag value or measurement such as
+ * `/^$var$/`). A `/` anywhere else (e.g. division) does not open a regex.
+ */
+export function isVariableInRegexLiteral(name: string, query: string): boolean {
+  const escapedName = escapeRegex(name);
+  // Matches $name and ${name} / ${name:format} references
+  const varRef = new RegExp(`\\$(?:${escapedName}\\b|\\{${escapedName}(?::[^}]*)?\\})`);
+  const literals: string[] = [];
+
+  const trimmed = query.trim();
+  if (trimmed.length > 1 && trimmed.startsWith('/') && trimmed.endsWith('/')) {
+    literals.push(trimmed.slice(1, -1));
+  }
+
+  // Regex literals anchored by an operator or FROM (with optional retention policy)
+  const anchoredLiteral = /(?:=~|!~|\bfrom\b(?:\s*"[^"]*"\s*\.)?)\s*\/((?:[^/\\]|\\.)*)\//gi;
+  for (const match of query.matchAll(anchoredLiteral)) {
+    literals.push(match[1]);
+  }
+
+  return literals.some((literal) => varRef.test(literal));
+}
+
 export default class InfluxDatasource extends DataSourceWithBackend<InfluxQuery, InfluxOptions> {
   type: string;
   urls: string[];
@@ -331,63 +358,41 @@ export default class InfluxDatasource extends DataSourceWithBackend<InfluxQuery,
   }
 
   interpolateQueryExpr(value: string | string[] = [], variable: QueryVariableModel, query?: string) {
-    if (typeof value === 'string') {
-      // Check the value is a number. If not run to escape special characters
-      if (!isNaN(parseFloat(value))) {
-        return value;
-      }
+    // Numbers need no escaping in any dialect
+    if (typeof value === 'string' && !isNaN(parseFloat(value))) {
+      return value;
     }
 
-    // If template variable is a multi-value variable
-    // we always want to deal with special chars.
-    if (variable.multi) {
+    // SQL has no regex literals, so regex escaping would corrupt values.
+    // Multiple values are quoted and comma-joined for use with IN ($var).
+    if (this.version === InfluxVersion.SQL) {
       if (typeof value === 'string') {
-        // Check the value is a number. If not run to escape special characters
-        if (isNaN(parseFloat(value))) {
-          return escapeRegex(value);
-        }
         return value;
       }
+      if (value.length === 1) {
+        return value[0];
+      }
+      return value.map((v) => `'${v.replace(/'/g, "''")}'`).join(', ');
+    }
 
-      // If the value is a string array first escape them then join them with pipe
-      // then put inside parenthesis.
+    // Multi-value variables always interpolate to an (a|b) alternation,
+    // which is only usable inside a regex, so always escape them
+    if (variable.multi) {
+      if (typeof value === 'string') {
+        return escapeRegex(value);
+      }
       return `(${value.map((v) => escapeRegex(v)).join('|')})`;
     }
 
-    // If the variable is not a multi-value variable
-    // we want to see how it's been used. If it is used in a regex expression
-    // we escape it. Otherwise, we return it directly.
-    // The regex below searches for regexes within the query string
-    const regexMatcher = new RegExp(/(?<=\/).+?(?=\/)/, 'gm');
-    // If matches are found this regex is evaluated to check if the variable is contained in the regex /^...$/ (^ and $ is optional)
-    // i.e. /^$myVar$/ or /$myVar/ or /^($myVar)$/
-    const regex = new RegExp(`\\/(?:\\^)?(.*)(\\$${variable.name})(.*)(?:\\$)?\\/`, 'gm');
-
-    // We need to validate the type of the query as some legacy cases can pass a query value with a different type
-    if (!query || typeof query !== 'string') {
+    // Legacy callers can pass a non-string query (e.g. templateSrv's default
+    // format function), in which case the usage context is unknown
+    if (!query || typeof query !== 'string' || !variable?.name) {
       return value;
     }
 
-    const queryMatches = query.match(regexMatcher);
-    if (!queryMatches) {
-      return value;
-    }
-    // Use the variable specific regex against the query
-    if (!query.match(regex)) {
-      return value;
-    }
-    for (const match of queryMatches) {
-      // It is expected that the RegExp should be valid. As our regex matcher matches any text between two '/'
-      // we also validate that the expression compiles before assuming it is a regular expression.
-      try {
-        new RegExp(match);
-
-        // If the value is a string array first escape them then join them with pipe
-        // then put inside parenthesis.
-        return typeof value === 'string' ? escapeRegex(value) : `(${value.map((v) => escapeRegex(v)).join('|')})`;
-      } catch (e) {
-        console.warn(`Supplied match is not valid regex: ${match}`);
-      }
+    // Single-value variables are only escaped when used inside a regex
+    if (isVariableInRegexLiteral(variable.name, query)) {
+      return typeof value === 'string' ? escapeRegex(value) : `(${value.map((v) => escapeRegex(v)).join('|')})`;
     }
 
     return value;
