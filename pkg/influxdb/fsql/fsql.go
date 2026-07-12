@@ -55,20 +55,7 @@ func Query(ctx context.Context, dsInfo *models.DatasourceInfo, req backend.Query
 		if err != nil {
 			errStr := fmt.Sprintf("flightsql: %s", err)
 			if grpcStatusErr, ok := status.FromError(err); ok {
-				switch grpcStatusErr.Code() {
-				case codes.InvalidArgument:
-					tRes.Responses[q.RefID] = backend.ErrDataResponseWithSource(backend.StatusBadRequest, backend.ErrorSourceDownstream, errStr)
-				case codes.PermissionDenied:
-					tRes.Responses[q.RefID] = backend.ErrDataResponseWithSource(backend.StatusForbidden, backend.ErrorSourceDownstream, errStr)
-				case codes.NotFound:
-					tRes.Responses[q.RefID] = backend.ErrDataResponseWithSource(backend.StatusNotFound, backend.ErrorSourceDownstream, errStr)
-				case codes.Unavailable:
-					tRes.Responses[q.RefID] = backend.ErrDataResponseWithSource(http.StatusServiceUnavailable, backend.ErrorSourceDownstream, errStr)
-				case codes.Unauthenticated:
-					tRes.Responses[q.RefID] = backend.ErrDataResponseWithSource(backend.StatusUnauthorized, backend.ErrorSourceDownstream, errStr)
-				default:
-					tRes.Responses[q.RefID] = backend.ErrDataResponse(backend.StatusInternal, errStr)
-				}
+				tRes.Responses[q.RefID] = backend.ErrDataResponseWithSource(backendStatus(grpcStatusErr.Code()), backend.ErrorSourceDownstream, errStr)
 			} else {
 				tRes.Responses[q.RefID] = backend.ErrDataResponse(backend.StatusInternal, errStr)
 			}
@@ -95,6 +82,24 @@ func Query(ctx context.Context, dsInfo *models.DatasourceInfo, req backend.Query
 	}
 
 	return tRes, nil
+}
+
+// backendStatus maps a gRPC status code to a backend plugin status.
+func backendStatus(code codes.Code) backend.Status {
+	switch code {
+	case codes.InvalidArgument:
+		return backend.StatusBadRequest
+	case codes.PermissionDenied:
+		return backend.StatusForbidden
+	case codes.NotFound:
+		return backend.StatusNotFound
+	case codes.Unavailable:
+		return backend.Status(http.StatusServiceUnavailable)
+	case codes.Unauthenticated:
+		return backend.StatusUnauthorized
+	default:
+		return backend.StatusInternal
+	}
 }
 
 type runner struct {

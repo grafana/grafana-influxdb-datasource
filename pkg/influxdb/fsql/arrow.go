@@ -16,6 +16,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 // TODO: Make this configurable. This is an arbitrary value right
@@ -39,6 +40,10 @@ func newQueryDataResponse(reader recordReader, query sqlutil.Query, headers meta
 	frame, err := frameForRecords(reader)
 	if err != nil {
 		resp.Error = err
+		if grpcStatusErr, ok := status.FromError(err); ok {
+			resp.Status = backendStatus(grpcStatusErr.Code())
+			resp.ErrorSource = backend.ErrorSourceDownstream
+		}
 	}
 	if frame.Rows() == 0 {
 		resp.Frames = data.Frames{}
@@ -101,10 +106,12 @@ func frameForRecords(reader recordReader) (*data.Frame, error) {
 			})
 			return frame, nil
 		}
-
-		if err := reader.Err(); err != nil && !errors.Is(err, io.EOF) {
-			return frame, err
-		}
+	}
+	// The flight reader surfaces stream errors (e.g. a gRPC error raised by
+	// the server mid-query) via Err only after Next returns false, so the
+	// check must happen after the loop.
+	if err := reader.Err(); err != nil && !errors.Is(err, io.EOF) {
+		return frame, err
 	}
 	return frame, nil
 }
@@ -172,10 +179,11 @@ func newDataField[T any](f arrow.Field) *data.Field {
 // copyData copies the contents of an Arrow column into a Data Frame field.
 //
 //nolint:gocyclo
-func copyData(field *data.Field, col arrow.Array) error {
+func copyData(field *data.Field, col arrow.Array) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println(fmt.Errorf("panic: %s %s", r, string(debug.Stack())))
+			slog.Error("panic while copying arrow data to frame", "field", field.Name, "panic", r, "stack", string(debug.Stack()))
+			err = fmt.Errorf("failed to copy arrow data to frame field %q: %v", field.Name, r)
 		}
 	}()
 
