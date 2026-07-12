@@ -1,12 +1,84 @@
 apiVersion: 1
 
+# One datasource per InfluxDB major version / query language combination served
+# by docker-compose.yaml. Fixture data covers 2026-06-01T00:00:00Z to
+# 2026-06-01T03:59:00Z — see tests/fixtures/README.md.
 datasources:
-  - name: InfluxDB
+  - name: InfluxDB v1 (InfluxQL)
+    uid: influxdb-v1-influxql
     type: influxdb
     access: proxy
+    url: http://influxdb1:8086
     isDefault: true
     orgId: 1
     version: 1
     editable: true
-    jsonData: {}
-    secureJsonData: {}
+    jsonData:
+      product: InfluxDB OSS 1.x
+      version: InfluxQL
+      dbName: fixtures
+      httpMode: POST
+
+  - name: InfluxDB v2 (Flux)
+    uid: influxdb-v2-flux
+    type: influxdb
+    access: proxy
+    url: http://influxdb2:8086
+    orgId: 1
+    version: 1
+    editable: true
+    jsonData:
+      product: InfluxDB OSS 2.x
+      version: Flux
+      organization: grafana
+      defaultBucket: fixtures
+    secureJsonData:
+      # Synthetic local-only token; matches DOCKER_INFLUXDB_INIT_ADMIN_TOKEN in
+      # docker-compose.yaml.
+      token: influxdb2-admin-token
+
+  - name: InfluxDB v2 (InfluxQL)
+    uid: influxdb-v2-influxql
+    type: influxdb
+    access: proxy
+    url: http://influxdb2:8086
+    orgId: 1
+    version: 1
+    editable: true
+    jsonData:
+      product: InfluxDB OSS 2.x
+      version: InfluxQL
+      dbName: fixtures
+      httpMode: POST
+      httpHeaderName1: Authorization
+    secureJsonData:
+      httpHeaderValue1: Token influxdb2-admin-token
+
+  - name: InfluxDB v3 (SQL)
+    uid: influxdb-v3-sql
+    type: influxdb
+    access: proxy
+    url: http://influxdb3:8181
+    orgId: 1
+    version: 1
+    editable: true
+    jsonData:
+      product: InfluxDB OSS 3.x
+      version: SQL
+      dbName: fixtures
+      # The server runs with --without-auth and plaintext gRPC.
+      insecureGrpc: true
+
+  - name: InfluxDB v3 (InfluxQL)
+    uid: influxdb-v3-influxql
+    type: influxdb
+    access: proxy
+    url: http://influxdb3:8181
+    orgId: 1
+    version: 1
+    editable: true
+    jsonData:
+      product: InfluxDB OSS 3.x
+      version: InfluxQL
+      dbName: fixtures
+      httpMode: POST

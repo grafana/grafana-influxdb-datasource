@@ -6,6 +6,22 @@ services:
     environment:
       # Grafana 13 enables splashScreen by default; the overlay blocks Playwright interactions.
       GF_FEATURE_TOGGLES_splashScreen: 'false'
+    depends_on:
+      # service_completed_successfully stops Grafana starting against an empty
+      # backend, which would let Playwright run fixture-data tests before the
+      # loaders finish.
+      influxdb1:
+        condition: service_healthy
+      influxdb2:
+        condition: service_healthy
+      influxdb3:
+        condition: service_healthy
+      influxdb1-loader:
+        condition: service_completed_successfully
+      influxdb2-loader:
+        condition: service_completed_successfully
+      influxdb3-loader:
+        condition: service_completed_successfully
     configs:
       # Run the externalized plugin in place of the core InfluxDB plugin.
       # Without as_external=true, DuplicatePluginIDValidation (pkg/services/pluginsintegration/pipeline/steps.go)
@@ -14,6 +30,124 @@ services:
       # [plugin.influxdb] already exists in defaults.ini — and it doesn't.
       - source: grafana_custom_ini
         target: /etc/grafana/grafana.ini
+
+  # ---------------------------------------------------------------------------
+  # InfluxDB 1.x (InfluxQL). Auth disabled by default in the OSS 1.x image.
+  # ---------------------------------------------------------------------------
+  influxdb1:
+    image: influxdb:1.11
+    ports:
+      - 8086:8086/tcp
+    healthcheck:
+      test: ['CMD', 'influx', '-execute', 'SHOW DATABASES']
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  influxdb1-loader:
+    image: curlimages/curl:latest
+    depends_on:
+      influxdb1:
+        condition: service_healthy
+    volumes:
+      - ./tests/fixtures:/data:ro
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        curl -sf --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors \
+          -XPOST 'http://influxdb1:8086/query' --data-urlencode 'q=CREATE DATABASE "fixtures"'
+        for file in /data/*.lp; do
+          curl -sf --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors \
+            -XPOST 'http://influxdb1:8086/write?db=fixtures' --data-binary @"$$file"
+        done
+    restart: 'no'
+
+  # ---------------------------------------------------------------------------
+  # InfluxDB 2.x (Flux, plus InfluxQL via a DBRP mapping created by the loader).
+  # ---------------------------------------------------------------------------
+  influxdb2:
+    image: influxdb:2.7
+    ports:
+      - 8087:8086/tcp
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: influxdb2-password
+      DOCKER_INFLUXDB_INIT_ORG: grafana
+      DOCKER_INFLUXDB_INIT_BUCKET: fixtures
+      # Synthetic local-only token; also referenced in provisioning/datasources/datasources.yml.
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: influxdb2-admin-token
+    healthcheck:
+      test: ['CMD', 'influx', 'ping']
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  influxdb2-loader:
+    # Server image so the `influx` CLI matches the server version exactly.
+    image: influxdb:2.7
+    depends_on:
+      influxdb2:
+        condition: service_healthy
+    volumes:
+      - ./tests/fixtures:/data:ro
+    environment:
+      INFLUX_HOST: http://influxdb2:8086
+      INFLUX_ORG: grafana
+      INFLUX_TOKEN: influxdb2-admin-token
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        for file in /data/*.lp; do
+          influx write --bucket fixtures --file "$$file"
+        done
+        # Map database "fixtures" onto the bucket so InfluxQL (v1 compatibility
+        # API) works against 2.x. Guarded because compose re-runs loaders on
+        # every `up` and `dbrp create` fails if the mapping already exists.
+        if ! influx v1 dbrp list --db fixtures --hide-headers | grep -q fixtures; then
+          bucket_id=$$(influx bucket list --name fixtures --hide-headers | cut -f 1)
+          influx v1 dbrp create --db fixtures --rp autogen --bucket-id "$$bucket_id" --default
+        fi
+    restart: 'no'
+
+  # ---------------------------------------------------------------------------
+  # InfluxDB 3.x Core (SQL via Flight SQL, plus InfluxQL via the v1
+  # compatibility API). --without-auth so no token bootstrap is needed;
+  # in-memory object store because fixtures are reloaded on every `up`.
+  # ---------------------------------------------------------------------------
+  influxdb3:
+    image: influxdb:3-core
+    command: influxdb3 serve --node-id node0 --object-store memory --without-auth
+    ports:
+      - 8181:8181/tcp
+    healthcheck:
+      test: ['CMD', 'influxdb3', 'show', 'databases']
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  influxdb3-loader:
+    image: curlimages/curl:latest
+    depends_on:
+      influxdb3:
+        condition: service_healthy
+    volumes:
+      - ./tests/fixtures:/data:ro
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        for file in /data/*.lp; do
+          curl -sf --retry 5 --retry-delay 2 --retry-connrefused --retry-all-errors \
+            -XPOST 'http://influxdb3:8181/api/v3/write_lp?db=fixtures&precision=nanosecond' \
+            --data-binary @"$$file"
+        done
+    restart: 'no'
 
 configs:
   grafana_custom_ini:
