@@ -6,10 +6,19 @@ import { type TemplateSrv, getTemplateSrv } from '@grafana/runtime';
 import { COMMON_FNS, type DB, type FuncParameter, type SQLQuery, SqlDatasource, formatSQL } from '@grafana/sql';
 
 import { mapFieldsToTypes } from './fields';
-import { buildColumnQuery, buildTableQuery } from './flightsqlMetaQuery';
+import { buildAllTablesQuery, buildColumnQuery, buildSchemaQuery, buildTableQuery } from './flightsqlMetaQuery';
 import { getSqlCompletionProvider } from './sqlCompletionProvider';
-import { quoteIdentifierIfNecessary, quoteLiteral, toRawSql } from './sqlUtil';
+import { quoteIdentifier, quoteIdentifierIfNecessary, quoteLiteral, toRawSql } from './sqlUtil';
 import { type FlightSQLOptions } from './types';
+
+// The schema InfluxDB v3 stores user tables in.
+const DEFAULT_SCHEMA = 'iox';
+
+// Code-editor completions insert identifiers into raw SQL, so anything that
+// is not a plain identifier needs quoting. Template variables stay bare.
+function completionText(value: string) {
+  return value.startsWith('$') ? value : quoteIdentifierIfNecessary(value);
+}
 
 export class FlightSQLDatasource extends SqlDatasource {
   sqlLanguageDefinition: LanguageDefinition | undefined;
@@ -42,13 +51,26 @@ export class FlightSQLDatasource extends SqlDatasource {
   }
 
   async fetchDatasets(): Promise<string[]> {
-    return Promise.resolve(['iox']);
+    const schemas = await this.runSql<string[]>(buildSchemaQuery(), { refId: 'datasets' });
+    return schemas.map((s) => s[0]);
   }
 
   async fetchTables(dataset?: string): Promise<string[]> {
     const query = buildTableQuery(dataset);
     const tables = await this.runSql<string[]>(query, { refId: 'tables' });
-    const tableNames = tables.map((t) => quoteIdentifierIfNecessary(t[0]));
+    const tableNames = tables.map((t) => t[0]);
+    tableNames.unshift(...this.getTemplateVariables());
+    return tableNames;
+  }
+
+  // Lists tables from every schema for the query builder. Tables outside the
+  // default schema get an explicit "schema"."table" reference.
+  async fetchAllTables(): Promise<string[]> {
+    const tables = await this.runSql<string[]>(buildAllTablesQuery(), { refId: 'tables' });
+    // runSql rows are DataFrameView proxies, only indexed access works
+    const tableNames = tables.map((t) =>
+      t[0] === DEFAULT_SCHEMA ? t[1] : `${quoteIdentifier(t[0])}.${quoteIdentifier(t[1])}`
+    );
     tableNames.unshift(...this.getTemplateVariables());
     return tableNames;
   }
@@ -63,7 +85,7 @@ export class FlightSQLDatasource extends SqlDatasource {
     const fields = frame.map((f) => ({
       name: f[0],
       text: f[0],
-      value: quoteIdentifierIfNecessary(f[0]),
+      value: f[0],
       type: f[1],
       label: f[0],
     }));
@@ -71,7 +93,7 @@ export class FlightSQLDatasource extends SqlDatasource {
       ...this.getTemplateVariables().map((v) => ({
         name: v,
         text: v,
-        value: quoteIdentifierIfNecessary(v),
+        value: v,
         type: '',
         label: v,
       }))
@@ -87,17 +109,21 @@ export class FlightSQLDatasource extends SqlDatasource {
     const defaultDB = this.instanceSettings.jsonData.database;
     if (!identifier?.schema && defaultDB) {
       const tables = await this.fetchTables(defaultDB);
-      return tables.map((t) => ({ name: t, completion: `${defaultDB}.${t}`, kind: CompletionItemKind.Class }));
+      return tables.map((t) => ({
+        name: t,
+        completion: `${defaultDB}.${completionText(t)}`,
+        kind: CompletionItemKind.Class,
+      }));
     } else if (!identifier?.schema && !defaultDB) {
       const datasets = await this.fetchDatasets();
       return datasets.map((d) => ({ name: d, completion: `${d}.`, kind: CompletionItemKind.Module }));
     } else {
       if (!identifier?.table && (!defaultDB || identifier?.schema)) {
         const tables = await this.fetchTables(identifier?.schema);
-        return tables.map((t) => ({ name: t, completion: t, kind: CompletionItemKind.Class }));
+        return tables.map((t) => ({ name: t, completion: completionText(t), kind: CompletionItemKind.Class }));
       } else if (identifier?.table && identifier.schema) {
         const fields = await this.fetchFields({ dataset: identifier.schema, table: identifier.table });
-        return fields.map((t) => ({ name: t.name, completion: t.value, kind: CompletionItemKind.Field }));
+        return fields.map((t) => ({ name: t.name, completion: completionText(t.value), kind: CompletionItemKind.Field }));
       } else {
         return [];
       }
@@ -140,7 +166,7 @@ export class FlightSQLDatasource extends SqlDatasource {
     }
     return {
       datasets: () => this.fetchDatasets(),
-      tables: (dataset?: string) => this.fetchTables(dataset),
+      tables: () => this.fetchAllTables(),
       fields: (query: SQLQuery) => this.fetchFields(query),
       validateQuery: (query: SQLQuery, range?: TimeRange) =>
         Promise.resolve({ query, error: '', isError: false, isValid: true }),
