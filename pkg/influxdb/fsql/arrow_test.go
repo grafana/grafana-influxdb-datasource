@@ -11,10 +11,13 @@ import (
 	"github.com/apache/arrow-go/v18/arrow/array"
 	"github.com/apache/arrow-go/v18/arrow/memory"
 	"github.com/google/go-cmp/cmp"
+	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 func TestNewQueryDataResponse(t *testing.T) {
@@ -294,6 +297,99 @@ type errReader struct {
 
 func (r errReader) Err() error {
 	return r.err
+}
+
+// streamErrReader mimics the arrow flight.Reader: when the server fails
+// mid-stream, Next returns false and the error is only available from Err
+// afterwards.
+type streamErrReader struct {
+	schema  *arrow.Schema
+	records []arrow.RecordBatch
+	idx     int
+	err     error
+}
+
+func (r *streamErrReader) Next() bool {
+	if r.idx < len(r.records) {
+		r.idx++
+		return true
+	}
+	return false
+}
+
+func (r *streamErrReader) Schema() *arrow.Schema { return r.schema }
+
+func (r *streamErrReader) Record() arrow.RecordBatch { return r.records[r.idx-1] }
+
+func (r *streamErrReader) Err() error {
+	if r.idx >= len(r.records) {
+		return r.err
+	}
+	return nil
+}
+
+func TestNewQueryDataResponse_StreamError(t *testing.T) {
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+
+	// The server fails before producing any record, e.g. a gRPC
+	// ResourceExhausted error on a query that is too large to execute. The
+	// error must not be swallowed and returned as an empty success.
+	reader := &streamErrReader{
+		schema: schema,
+		err:    status.Error(codes.ResourceExhausted, "Resources exhausted: Additional allocation failed"),
+	}
+	query := sqlutil.Query{Format: sqlutil.FormatOptionTable}
+	resp := newQueryDataResponse(reader, query, metadata.MD{})
+	assert.Error(t, resp.Error)
+	assert.ErrorContains(t, resp.Error, "Resources exhausted")
+	assert.Equal(t, backend.ErrorSourceDownstream, resp.ErrorSource)
+}
+
+func TestNewQueryDataResponse_StreamErrorAfterRecords(t *testing.T) {
+	alloc := memory.DefaultAllocator
+	schema := arrow.NewSchema(
+		[]arrow.Field{
+			{Name: "value", Type: arrow.PrimitiveTypes.Int64},
+		},
+		nil,
+	)
+	i64s, _, err := array.FromJSON(
+		alloc,
+		arrow.PrimitiveTypes.Int64,
+		strings.NewReader(`[1, 2, 3]`),
+	)
+	assert.NoError(t, err)
+	record := array.NewRecordBatch(schema, []arrow.Array{i64s}, -1)
+
+	// The server fails after streaming one record. The partial result must
+	// not be returned as a complete success.
+	reader := &streamErrReader{
+		schema:  schema,
+		records: []arrow.RecordBatch{record},
+		err:     status.Error(codes.Internal, "stream interrupted"),
+	}
+	query := sqlutil.Query{Format: sqlutil.FormatOptionTable}
+	resp := newQueryDataResponse(reader, query, metadata.MD{})
+	assert.Error(t, resp.Error)
+	assert.ErrorContains(t, resp.Error, "stream interrupted")
+}
+
+func TestCopyData_MismatchedTypeReturnsError(t *testing.T) {
+	// An arrow column whose type does not match the frame field must return
+	// an error instead of silently dropping the column's values.
+	field := data.NewField("field", nil, []string{})
+	builder := array.NewInt64Builder(memory.DefaultAllocator)
+	builder.Append(1)
+	arr := builder.NewArray()
+	defer arr.Release()
+
+	err := copyData(field, arr)
+	assert.Error(t, err)
 }
 
 func TestNewFrame(t *testing.T) {
