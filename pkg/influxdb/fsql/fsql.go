@@ -34,11 +34,29 @@ type Executor struct {
 // NewExecutor validates the datasource configuration and dials the Flight
 // SQL client for this request.
 func NewExecutor(dsInfo *models.DatasourceInfo) (*Executor, error) {
-	r, err := runnerFromDataSource(dsInfo)
+	if dsInfo.URL == "" {
+		return nil, fmt.Errorf("missing URL from datasource configuration")
+	}
+
+	u, err := ParseURL(dsInfo.URL)
 	if err != nil {
 		return nil, err
 	}
-	return &Executor{client: r.client}, nil
+
+	md := metadata.MD{}
+	if dsInfo.DbName != "" {
+		md.Set("database", dsInfo.DbName)
+	}
+	if dsInfo.Token != "" {
+		md.Set("Authorization", fmt.Sprintf("Bearer %s", dsInfo.Token))
+	}
+
+	fsqlClient, err := newFlightSQLClient(u, md, !dsInfo.InsecureGrpc, dsInfo.TLSConfig, dsInfo.ProxyClient)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Executor{client: fsqlClient}, nil
 }
 
 // Execute runs one query and returns its response. Failures are reported
@@ -107,33 +125,6 @@ func errorResponse(err error) backend.DataResponse {
 	}
 }
 
-// Query is a temporary wrapper kept until the dispatcher moves to
-// NewExecutor/Execute.
-func Query(ctx context.Context, dsInfo *models.DatasourceInfo, req backend.QueryDataRequest) (
-	*backend.QueryDataResponse, error) {
-	logger := glog.FromContext(ctx)
-	tRes := backend.NewQueryDataResponse()
-
-	executor, err := NewExecutor(dsInfo)
-	if err != nil {
-		return tRes, err
-	}
-	defer func() {
-		if err := executor.Close(); err != nil {
-			logger.Warn("Failed to close fsql client", "err", err)
-		}
-	}()
-
-	for _, q := range req.Queries {
-		tRes.Responses[q.RefID] = executor.Execute(ctx, q)
-	}
-	return tRes, nil
-}
-
-type runner struct {
-	client *client
-}
-
 func ParseURL(endpoint string) (string, error) {
 	if endpoint == "" {
 		return "", fmt.Errorf("missing URL from datasource configuration")
@@ -156,33 +147,4 @@ func ParseURL(endpoint string) (string, error) {
 	}
 
 	return addr, nil
-}
-
-// runnerFromDataSource creates a runner from the datasource model (the datasource instance's configuration).
-func runnerFromDataSource(dsInfo *models.DatasourceInfo) (*runner, error) {
-	if dsInfo.URL == "" {
-		return nil, fmt.Errorf("missing URL from datasource configuration")
-	}
-
-	u, err := ParseURL(dsInfo.URL)
-	if err != nil {
-		return nil, err
-	}
-
-	md := metadata.MD{}
-	if dsInfo.DbName != "" {
-		md.Set("database", dsInfo.DbName)
-	}
-	if dsInfo.Token != "" {
-		md.Set("Authorization", fmt.Sprintf("Bearer %s", dsInfo.Token))
-	}
-
-	fsqlClient, err := newFlightSQLClient(u, md, !dsInfo.InsecureGrpc, dsInfo.TLSConfig, dsInfo.ProxyClient)
-	if err != nil {
-		return nil, err
-	}
-
-	return &runner{
-		client: fsqlClient,
-	}, nil
 }
