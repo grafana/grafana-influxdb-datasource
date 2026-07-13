@@ -112,6 +112,40 @@ func (suite *FSQLTestSuite) TestIntegration_QueryData() {
 	})
 }
 
+func (suite *FSQLTestSuite) TestIntegration_QueryDataBatchContinuesAfterError() {
+	resp, err := Query(
+		context.Background(),
+		&models.DatasourceInfo{
+			HTTPClient:   nil,
+			Token:        "secret",
+			URL:          "http://" + suite.addr,
+			DbName:       "influxdb",
+			Version:      "test",
+			HTTPMode:     "proxy",
+			InsecureGrpc: true,
+			ProxyClient:  proxy.New(nil),
+		},
+		backend.QueryDataRequest{
+			Queries: []backend.DataQuery{
+				{
+					RefID: "A",
+					JSON:  mustQueryJSON(suite.T(), "A", "select * from table_that_does_not_exist"),
+				},
+				{
+					RefID: "B",
+					JSON:  mustQueryJSON(suite.T(), "B", "select 1"),
+				},
+			},
+		},
+	)
+
+	require.NoError(suite.T(), err)
+	require.Len(suite.T(), resp.Responses, 2, "the failing query must not abandon the batch")
+	require.Error(suite.T(), resp.Responses["A"].Error)
+	require.NoError(suite.T(), resp.Responses["B"].Error)
+	require.NotEmpty(suite.T(), resp.Responses["B"].Frames)
+}
+
 func mustQueryJSON(t *testing.T, refID, sql string) []byte {
 	t.Helper()
 
