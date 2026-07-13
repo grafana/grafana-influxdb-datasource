@@ -1,0 +1,7 @@
+# TruffleHog path exclusions, appended to the org-wide list by the required
+# org-required-trufflehog.yml workflow (grafana/security-github-actions).
+# Syntax: one Go regex per line.
+#
+# Test fixture files contain synthetic hex strings (traceId, spanId) that
+# trigger false positives. These files hold no real credentials.
+tests/fixtures/

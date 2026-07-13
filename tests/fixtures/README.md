@@ -42,4 +42,7 @@ time-series-datagen \
 
 The trace and span IDs in `httplogs.lp` are synthetic hex strings, not real
 credentials. They are excluded from secret scanning in
-[.trufflehog.yml](../../.trufflehog.yml).
+[.trufflehogignore](../../.trufflehogignore), which the org-required
+TruffleHog workflow appends to its central exclude list. The local file must
+be named `.trufflehogignore` (one Go regex per line) — a `.trufflehog.yml`
+is not read by that workflow.

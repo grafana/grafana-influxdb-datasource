@@ -1,4 +1,0 @@
-# Test fixture files contain synthetic hex strings (traceId, spanId, etc.)
-# that trigger false positives. These files hold no real credentials.
-exclude_paths:
-  - tests/fixtures/
