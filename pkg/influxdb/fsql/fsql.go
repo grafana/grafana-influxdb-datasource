@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/apache/arrow-go/v18/arrow/flight"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -74,17 +76,9 @@ func (e *Executor) Execute(ctx context.Context, q backend.DataQuery) backend.Dat
 	}
 
 	logger.Info(fmt.Sprintf("InfluxDB executing SQL: %s", qm.RawSQL))
-	info, err := e.client.Execute(ctx, qm.RawSQL)
-	if err != nil {
-		return errorResponse(err)
-	}
-	if len(info.Endpoint) != 1 {
-		return backend.ErrDataResponse(backend.StatusInternal, fmt.Sprintf("unsupported endpoint count in response: %d", len(info.Endpoint)))
-	}
-
-	reader, err := e.client.DoGetWithHeaderExtraction(ctx, info.Endpoint[0].Ticket)
-	if err != nil {
-		return backend.ErrDataResponse(backend.StatusInternal, fmt.Sprintf("flightsql: %s", err))
+	reader, errResp := runQuery(ctx, e.client, qm.RawSQL)
+	if errResp != nil {
+		return *errResp
 	}
 	defer reader.Release()
 
@@ -94,6 +88,36 @@ func (e *Executor) Execute(ctx context.Context, q backend.DataQuery) backend.Dat
 	}
 
 	return newQueryDataResponse(reader, *qm.Query, headers)
+}
+
+// flightRunner is the slice of the Flight SQL client the run stage needs,
+// defined here so runQuery can be unit-tested with a fake client.
+type flightRunner interface {
+	Execute(ctx context.Context, sql string, opts ...grpc.CallOption) (*flight.FlightInfo, error)
+	DoGetWithHeaderExtraction(ctx context.Context, in *flight.Ticket, opts ...grpc.CallOption) (*flightReader, error)
+}
+
+// runQuery owns the gRPC mechanics: it executes the SQL and opens the result
+// stream, mapping transport failures to data responses. A non-nil response
+// means the query failed and the reader is nil. Parsing stays in
+// newQueryDataResponse.
+func runQuery(ctx context.Context, c flightRunner, sql string) (*flightReader, *backend.DataResponse) {
+	info, err := c.Execute(ctx, sql)
+	if err != nil {
+		resp := errorResponse(err)
+		return nil, &resp
+	}
+	if len(info.Endpoint) != 1 {
+		resp := backend.ErrDataResponse(backend.StatusInternal, fmt.Sprintf("unsupported endpoint count in response: %d", len(info.Endpoint)))
+		return nil, &resp
+	}
+
+	reader, err := c.DoGetWithHeaderExtraction(ctx, info.Endpoint[0].Ticket)
+	if err != nil {
+		resp := backend.ErrDataResponse(backend.StatusInternal, fmt.Sprintf("flightsql: %s", err))
+		return nil, &resp
+	}
+	return reader, nil
 }
 
 // Close releases the Flight SQL client and its gRPC connection.
