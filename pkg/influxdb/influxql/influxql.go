@@ -3,17 +3,14 @@ package influxql
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
-	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/grafana/dskit/concurrency"
 	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/influxql/buffered"
 	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/influxql/querydata"
 	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/models"
@@ -87,47 +84,6 @@ func (e *Executor) Execute(ctx context.Context, reqQuery backend.DataQuery) back
 // resources beyond the shared HTTP client.
 func (e *Executor) Close() error {
 	return nil
-}
-
-// Query is a temporary wrapper kept until the dispatcher moves to
-// NewExecutor/Execute; both feature-flag branches share Execute so the
-// per-query pipeline exists exactly once.
-func Query(ctx context.Context, tracer trace.Tracer, dsInfo *models.DatasourceInfo, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	logger := glog.FromContext(ctx)
-	response := backend.NewQueryDataResponse()
-	cfg := config.GrafanaConfigFromContext(ctx)
-
-	executor, err := NewExecutor(ctx, tracer, dsInfo)
-	if err != nil {
-		return response, err
-	}
-
-	if cfg.FeatureToggles().IsEnabled("influxdbRunQueriesInParallel") {
-		concurrentQueryCount, err := req.PluginContext.GrafanaConfig.ConcurrentQueryCount()
-		if err != nil {
-			logger.Debug(fmt.Sprintf("Concurrent Query Count read/parse error: %v", err), "influxdbRunQueriesInParallel")
-			concurrentQueryCount = 10
-		}
-
-		responseLock := sync.Mutex{}
-		err = concurrency.ForEachJob(ctx, len(req.Queries), concurrentQueryCount, func(ctx context.Context, idx int) error {
-			reqQuery := req.Queries[idx]
-			res := executor.Execute(ctx, reqQuery)
-			responseLock.Lock()
-			defer responseLock.Unlock()
-			response.Responses[reqQuery.RefID] = res
-			return nil
-		})
-		if err != nil {
-			logger.Debug("Influxdb concurrent query error", "concurrent query", err)
-		}
-	} else {
-		for _, reqQuery := range req.Queries {
-			response.Responses[reqQuery.RefID] = executor.Execute(ctx, reqQuery)
-		}
-	}
-
-	return response, nil
 }
 
 func createRequest(ctx context.Context, logger log.Logger, dsInfo *models.DatasourceInfo, queryStr string, retentionPolicy string) (*http.Request, error) {

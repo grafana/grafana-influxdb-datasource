@@ -67,38 +67,36 @@ func TestIntegrationFSQLTestSuite(t *testing.T) {
 	suite.Run(t, new(FSQLTestSuite))
 }
 
+func (suite *FSQLTestSuite) newExecutor() *Executor {
+	executor, err := NewExecutor(&models.DatasourceInfo{
+		HTTPClient:   nil,
+		Token:        "secret",
+		URL:          "http://" + suite.addr,
+		DbName:       "influxdb",
+		Version:      "test",
+		HTTPMode:     "proxy",
+		InsecureGrpc: true,
+		ProxyClient:  proxy.New(nil),
+	})
+	require.NoError(suite.T(), err)
+	return executor
+}
+
 func (suite *FSQLTestSuite) TestIntegration_QueryData() {
 	suite.Run("should run simple query data", func() {
-		resp, err := Query(
-			context.Background(),
-			&models.DatasourceInfo{
-				HTTPClient:   nil,
-				Token:        "secret",
-				URL:          "http://" + suite.addr,
-				DbName:       "influxdb",
-				Version:      "test",
-				HTTPMode:     "proxy",
-				InsecureGrpc: true,
-				ProxyClient:  proxy.New(nil),
-			},
-			backend.QueryDataRequest{
-				Queries: []backend.DataQuery{
-					{
-						RefID: "A",
-						JSON:  mustQueryJSON(suite.T(), "A", "select * from intTable"),
-					},
-					{
-						RefID: "B",
-						JSON:  mustQueryJSON(suite.T(), "B", "select 1"),
-					},
-				},
-			},
-		)
+		executor := suite.newExecutor()
+		defer func() { require.NoError(suite.T(), executor.Close()) }()
 
-		require.NoError(suite.T(), err)
-		require.Len(suite.T(), resp.Responses, 2)
+		respA := executor.Execute(context.Background(), backend.DataQuery{
+			RefID: "A",
+			JSON:  mustQueryJSON(suite.T(), "A", "select * from intTable"),
+		})
+		respB := executor.Execute(context.Background(), backend.DataQuery{
+			RefID: "B",
+			JSON:  mustQueryJSON(suite.T(), "B", "select 1"),
+		})
+		require.NoError(suite.T(), respB.Error)
 
-		respA := resp.Responses["A"]
 		require.NoError(suite.T(), respA.Error)
 		frame := respA.Frames[0]
 
@@ -113,37 +111,21 @@ func (suite *FSQLTestSuite) TestIntegration_QueryData() {
 }
 
 func (suite *FSQLTestSuite) TestIntegration_QueryDataBatchContinuesAfterError() {
-	resp, err := Query(
-		context.Background(),
-		&models.DatasourceInfo{
-			HTTPClient:   nil,
-			Token:        "secret",
-			URL:          "http://" + suite.addr,
-			DbName:       "influxdb",
-			Version:      "test",
-			HTTPMode:     "proxy",
-			InsecureGrpc: true,
-			ProxyClient:  proxy.New(nil),
-		},
-		backend.QueryDataRequest{
-			Queries: []backend.DataQuery{
-				{
-					RefID: "A",
-					JSON:  mustQueryJSON(suite.T(), "A", "select * from table_that_does_not_exist"),
-				},
-				{
-					RefID: "B",
-					JSON:  mustQueryJSON(suite.T(), "B", "select 1"),
-				},
-			},
-		},
-	)
+	executor := suite.newExecutor()
+	defer func() { require.NoError(suite.T(), executor.Close()) }()
 
-	require.NoError(suite.T(), err)
-	require.Len(suite.T(), resp.Responses, 2, "the failing query must not abandon the batch")
-	require.Error(suite.T(), resp.Responses["A"].Error)
-	require.NoError(suite.T(), resp.Responses["B"].Error)
-	require.NotEmpty(suite.T(), resp.Responses["B"].Frames)
+	respA := executor.Execute(context.Background(), backend.DataQuery{
+		RefID: "A",
+		JSON:  mustQueryJSON(suite.T(), "A", "select * from table_that_does_not_exist"),
+	})
+	respB := executor.Execute(context.Background(), backend.DataQuery{
+		RefID: "B",
+		JSON:  mustQueryJSON(suite.T(), "B", "select 1"),
+	})
+
+	require.Error(suite.T(), respA.Error, "the failing query must report its error")
+	require.NoError(suite.T(), respB.Error, "the failing query must not abandon the batch")
+	require.NotEmpty(suite.T(), respB.Frames)
 }
 
 func mustQueryJSON(t *testing.T, refID, sql string) []byte {
@@ -173,28 +155,24 @@ func freeport(t *testing.T) (addr string, err error) {
 }
 
 func TestInvalidSchema(t *testing.T) {
-	resp, _ := Query(
-		context.Background(),
-		&models.DatasourceInfo{
-			HTTPClient:   nil,
-			Token:        "secret",
-			URL:          "http://127.0.0.1:1234",
-			DbName:       "influxdb",
-			Version:      "test",
-			HTTPMode:     "proxy",
-			InsecureGrpc: true,
-			ProxyClient:  proxy.New(nil),
-		},
-		backend.QueryDataRequest{
-			Queries: []backend.DataQuery{
-				{
-					RefID: "A",
-					JSON:  []byte(`this is not valid JSON`),
-				},
-			},
-		},
-	)
-	require.Equal(t, backend.ErrorSourceDownstream, resp.Responses["A"].ErrorSource)
+	executor, err := NewExecutor(&models.DatasourceInfo{
+		HTTPClient:   nil,
+		Token:        "secret",
+		URL:          "http://127.0.0.1:1234",
+		DbName:       "influxdb",
+		Version:      "test",
+		HTTPMode:     "proxy",
+		InsecureGrpc: true,
+		ProxyClient:  proxy.New(nil),
+	})
+	require.NoError(t, err)
+	defer func() { require.NoError(t, executor.Close()) }()
+
+	resp := executor.Execute(context.Background(), backend.DataQuery{
+		RefID: "A",
+		JSON:  []byte(`this is not valid JSON`),
+	})
+	require.Equal(t, backend.ErrorSourceDownstream, resp.ErrorSource)
 }
 
 func TestParseURL(t *testing.T) {
