@@ -3,6 +3,7 @@ package influxql
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -30,21 +31,31 @@ var (
 	glog               = backend.NewLoggerWith("logger", "tsdb.influx_influxql")
 )
 
+// responseParser turns an InfluxQL response body into a data response. Both
+// parser packages (buffered and streaming querydata) match this signature,
+// making the parsing strategy a swappable seam.
+type responseParser func(io.ReadCloser, int, *models.Query) *backend.DataResponse
+
 // Executor runs InfluxQL queries for a single request. It is safe for
 // concurrent use: per-query state lives entirely inside Execute.
 type Executor struct {
-	dsInfo                 *models.DatasourceInfo
-	tracer                 trace.Tracer
-	streamingParserEnabled bool
+	dsInfo *models.DatasourceInfo
+	tracer trace.Tracer
+	parse  responseParser
 }
 
-// NewExecutor reads the request-scoped feature toggles once and returns an
-// executor for this request.
+// NewExecutor reads the request-scoped feature toggles once, selects the
+// parsing strategy for this request and returns an executor.
 func NewExecutor(ctx context.Context, tracer trace.Tracer, dsInfo *models.DatasourceInfo) (*Executor, error) {
+	var parse responseParser = buffered.ResponseParse
+	if config.GrafanaConfigFromContext(ctx).FeatureToggles().IsEnabled("influxqlStreamingParser") {
+		glog.FromContext(ctx).Info("InfluxDB InfluxQL streaming parser enabled: ", "info")
+		parse = querydata.ResponseParse
+	}
 	return &Executor{
-		dsInfo:                 dsInfo,
-		tracer:                 tracer,
-		streamingParserEnabled: config.GrafanaConfigFromContext(ctx).FeatureToggles().IsEnabled("influxqlStreamingParser"),
+		dsInfo: dsInfo,
+		tracer: tracer,
+		parse:  parse,
 	}, nil
 }
 
@@ -74,10 +85,35 @@ func (e *Executor) Execute(ctx context.Context, reqQuery backend.DataQuery) back
 		return backend.DataResponse{Error: err, ErrorSource: backend.ErrorSourceDownstream}
 	}
 
-	// On error, execute has already set Error (and ErrorSource where known)
-	// on the returned response, so the error value adds nothing here.
-	resp, _ := execute(ctx, e.tracer, e.dsInfo, logger, query, request, e.streamingParserEnabled)
-	return resp
+	res, err := e.dsInfo.HTTPClient.Do(request)
+	if err != nil {
+		return backend.DataResponse{Error: err, ErrorSource: backend.ErrorSourceDownstream}
+	}
+
+	return e.parseResponse(ctx, res, query)
+}
+
+// parseResponse owns everything response-shaped: it closes the body, wraps
+// parsing in a span, applies the parsing strategy chosen at construction and
+// stamps custom metadata headers onto the first frame.
+func (e *Executor) parseResponse(ctx context.Context, res *http.Response, query *models.Query) backend.DataResponse {
+	logger := glog.FromContext(ctx)
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			logger.Warn("Failed to close response body", "err", err)
+		}
+	}()
+
+	_, endSpan := startTrace(ctx, e.tracer, "datasource.influxdb.influxql.parseResponse")
+	defer endSpan()
+
+	resp := e.parse(res.Body, res.StatusCode, query)
+
+	if len(resp.Frames) > 0 {
+		resp.Frames[0].Meta.Custom = readCustomMetadata(res)
+	}
+
+	return *resp
 }
 
 // Close implements the executor contract; InfluxQL holds no per-request
@@ -141,38 +177,6 @@ func createRequest(ctx context.Context, logger log.Logger, dsInfo *models.Dataso
 
 	logger.Debug("Influxdb request", "url", req.URL.String())
 	return req, nil
-}
-
-func execute(ctx context.Context, tracer trace.Tracer, dsInfo *models.DatasourceInfo, logger log.Logger, query *models.Query, request *http.Request, isStreamingParserEnabled bool) (backend.DataResponse, error) {
-	res, err := dsInfo.HTTPClient.Do(request)
-	if err != nil {
-		return backend.DataResponse{
-			Error:       err,
-			ErrorSource: backend.ErrorSourceDownstream,
-		}, err
-	}
-	defer func() {
-		if err := res.Body.Close(); err != nil {
-			logger.Warn("Failed to close response body", "err", err)
-		}
-	}()
-
-	_, endSpan := startTrace(ctx, tracer, "datasource.influxdb.influxql.parseResponse")
-	defer endSpan()
-
-	var resp *backend.DataResponse
-	if isStreamingParserEnabled {
-		logger.Info("InfluxDB InfluxQL streaming parser enabled: ", "info")
-		resp = querydata.ResponseParse(res.Body, res.StatusCode, query)
-	} else {
-		resp = buffered.ResponseParse(res.Body, res.StatusCode, query)
-	}
-
-	if len(resp.Frames) > 0 {
-		resp.Frames[0].Meta.Custom = readCustomMetadata(res)
-	}
-
-	return *resp, nil
 }
 
 func readCustomMetadata(res *http.Response) map[string]any {
