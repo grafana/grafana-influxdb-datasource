@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/apache/arrow-go/v18/arrow/flight"
@@ -108,6 +110,30 @@ func (suite *FSQLTestSuite) TestIntegration_QueryData() {
 			require.Equal(suite.T(), 4, f.Len())
 		}
 	})
+}
+
+func (suite *FSQLTestSuite) TestIntegration_ConcurrentExecute() {
+	executor := suite.newExecutor()
+	defer func() { require.NoError(suite.T(), executor.Close()) }()
+
+	var wg sync.WaitGroup
+	responses := make([]backend.DataResponse, 50)
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			responses[idx] = executor.Execute(context.Background(), backend.DataQuery{
+				RefID: fmt.Sprintf("Q%d", idx),
+				JSON:  mustQueryJSON(suite.T(), fmt.Sprintf("Q%d", idx), "select * from intTable"),
+			})
+		}(i)
+	}
+	wg.Wait()
+
+	for i, res := range responses {
+		require.NoError(suite.T(), res.Error, "query %d failed", i)
+		require.NotEmpty(suite.T(), res.Frames, "query %d returned no frames", i)
+	}
 }
 
 func (suite *FSQLTestSuite) TestIntegration_QueryDataBatchContinuesAfterError() {
