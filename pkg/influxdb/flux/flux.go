@@ -57,27 +57,6 @@ func (e *Executor) Close() error {
 	return nil
 }
 
-// Query is a temporary wrapper kept until the dispatcher moves to
-// NewExecutor/Execute.
-func Query(ctx context.Context, dsInfo *models.DatasourceInfo, tsdbQuery backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	logger := glog.FromContext(ctx)
-	tRes := backend.NewQueryDataResponse()
-	executor, err := NewExecutor(dsInfo)
-	if err != nil {
-		return &backend.QueryDataResponse{}, err
-	}
-	defer func() {
-		if err := executor.Close(); err != nil {
-			logger.Warn("Failed to close flux client", "err", err)
-		}
-	}()
-
-	for _, query := range tsdbQuery.Queries {
-		tRes.Responses[query.RefID] = executor.Execute(ctx, query)
-	}
-	return tRes, nil
-}
-
 // runner is an influxdb2 Client with an attached org property and is used
 // for running flux queries.
 type runner struct {

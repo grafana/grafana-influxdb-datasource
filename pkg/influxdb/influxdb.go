@@ -9,11 +9,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
 
-	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/flux"
-	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/fsql"
-	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/influxql"
 	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/models"
 )
 
@@ -89,19 +85,7 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 func (ds *DataSource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
 	logger := logger.FromContext(ctx)
 	logger.Debug("Received a query request", "numQueries", len(req.Queries))
-
-	tracer := tracing.DefaultTracer()
-
 	logger.Debug(fmt.Sprintf("Making a %s type query", ds.info.Version))
 
-	switch ds.info.Version {
-	case influxVersionFlux:
-		return flux.Query(ctx, ds.info, *req)
-	case influxVersionInfluxQL:
-		return influxql.Query(ctx, tracer, ds.info, req)
-	case influxVersionSQL:
-		return fsql.Query(ctx, ds.info, *req)
-	default:
-		return nil, fmt.Errorf("unknown influxdb version")
-	}
+	return executeRequest(ctx, ds.info, req)
 }
