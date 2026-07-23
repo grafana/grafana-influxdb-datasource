@@ -39,11 +39,15 @@ func newQueryDataResponse(reader recordReader, query sqlutil.Query, headers meta
 	var resp backend.DataResponse
 	frame, err := frameForRecords(reader)
 	if err != nil {
+		// Discard any partially received rows: a failed stream must not be
+		// mistaken for a complete result.
 		resp.Error = err
+		resp.Frames = data.Frames{}
 		if grpcStatusErr, ok := status.FromError(err); ok {
 			resp.Status = backendStatus(grpcStatusErr.Code())
 			resp.ErrorSource = backend.ErrorSourceDownstream
 		}
+		return resp
 	}
 	if frame.Rows() == 0 {
 		resp.Frames = data.Frames{}

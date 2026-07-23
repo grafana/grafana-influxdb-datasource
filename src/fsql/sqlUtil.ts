@@ -70,12 +70,12 @@ export function toRawSql({ sql, table }: SQLQuery): string {
   }
 
   if (sql.groupBy?.[0]?.property.name) {
-    const groupBy = sql.groupBy.map((g) => `"${g.property.name}"`).filter((g) => !isEmpty(g));
+    const groupBy = sql.groupBy.map((g) => formatColumnName(g.property.name)).filter((g) => !isEmpty(g));
     rawQuery += `GROUP BY ${groupBy.join(', ')} `;
   }
 
   if (sql.orderBy?.property.name) {
-    rawQuery += `ORDER BY "${sql.orderBy.property.name}" `;
+    rawQuery += `ORDER BY ${formatColumnName(sql.orderBy.property.name)} `;
   }
 
   if (sql.orderBy?.property.name && sql.orderByDirection) {
