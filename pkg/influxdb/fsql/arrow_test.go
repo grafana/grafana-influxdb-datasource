@@ -364,7 +364,9 @@ func TestNewQueryDataResponse_StreamErrorAfterRecords(t *testing.T) {
 		strings.NewReader(`[1, 2, 3]`),
 	)
 	assert.NoError(t, err)
+	defer i64s.Release()
 	record := array.NewRecordBatch(schema, []arrow.Array{i64s}, -1)
+	defer record.Release()
 
 	// The server fails after streaming one record. The partial result must
 	// not be returned as a complete success.
@@ -377,6 +379,9 @@ func TestNewQueryDataResponse_StreamErrorAfterRecords(t *testing.T) {
 	resp := newQueryDataResponse(reader, query, metadata.MD{})
 	assert.Error(t, resp.Error)
 	assert.ErrorContains(t, resp.Error, "stream interrupted")
+	assert.Equal(t, backend.ErrorSourceDownstream, resp.ErrorSource)
+	assert.Equal(t, backend.StatusInternal, resp.Status)
+	assert.Empty(t, resp.Frames)
 }
 
 func TestCopyData_MismatchedTypeReturnsError(t *testing.T) {
