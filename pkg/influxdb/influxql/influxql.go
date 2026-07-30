@@ -82,7 +82,7 @@ func Query(ctx context.Context, tracer trace.Tracer, dsInfo *models.DatasourceIn
 				return nil
 			}
 
-			resp, err := execute(ctx, tracer, dsInfo, logger, query, request, config.FeatureToggles().IsEnabled("influxqlStreamingParser"))
+			resp, _ := execute(ctx, tracer, dsInfo, logger, query, request, config.FeatureToggles().IsEnabled("influxqlStreamingParser"))
 
 			responseLock.Lock()
 			defer responseLock.Unlock()
@@ -121,7 +121,7 @@ func Query(ctx context.Context, tracer trace.Tracer, dsInfo *models.DatasourceIn
 				continue
 			}
 
-			resp, err := execute(ctx, tracer, dsInfo, logger, query, request, config.FeatureToggles().IsEnabled("influxqlStreamingParser"))
+			resp, _ := execute(ctx, tracer, dsInfo, logger, query, request, config.FeatureToggles().IsEnabled("influxqlStreamingParser"))
 			response.Responses[query.RefID] = resp
 		}
 	}
