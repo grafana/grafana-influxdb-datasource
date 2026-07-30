@@ -2,6 +2,8 @@ package influxql
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -14,6 +16,51 @@ import (
 
 	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/models"
 )
+
+// roundTripperFunc lets us stub an *http.Client transport in tests.
+type roundTripperFunc func(req *http.Request) (*http.Response, error)
+
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func TestQuery_httpConnectionFailureIsDownstream(t *testing.T) {
+	// Simulate a transport-level failure (e.g. a TLS handshake error) from
+	// the request to the InfluxDB /query endpoint.
+	connErr := errors.New("remote error: tls: internal error")
+	dsInfo := &models.DatasourceInfo{
+		URL:      "http://influxdb:1337",
+		DbName:   "testdb",
+		HTTPMode: "GET",
+		HTTPClient: &http.Client{
+			Transport: roundTripperFunc(func(_ *http.Request) (*http.Response, error) {
+				return nil, connErr
+			}),
+		},
+	}
+
+	queryJSON, err := json.Marshal(map[string]any{
+		"query":    "SELECT * FROM testdb",
+		"rawQuery": true,
+	})
+	require.NoError(t, err)
+
+	req := &backend.QueryDataRequest{
+		Queries: []backend.DataQuery{
+			{RefID: "A", JSON: queryJSON},
+		},
+	}
+
+	res, err := Query(context.Background(), nil, dsInfo, req)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	dr, ok := res.Responses["A"]
+	require.True(t, ok, "expected a response for RefID A")
+	require.Error(t, dr.Error)
+	assert.ErrorContains(t, dr.Error, connErr.Error())
+	assert.Equal(t, backend.ErrorSourceDownstream, dr.ErrorSource)
+}
 
 func TestExecutor_createRequest(t *testing.T) {
 	logger := backend.NewLoggerWith("logger", "tsdb.influx_influxql_test")
