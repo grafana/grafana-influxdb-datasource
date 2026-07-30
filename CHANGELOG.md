@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.1.1
+
+- Correct error source for InfluxQL query errors ([#77](https://github.com/grafana/grafana-influxdb-datasource/pull/77))
+
 ## 13.1.0
 
 - Support annotation queries in SQL mode ([#58](https://github.com/grafana/grafana-influxdb-datasource/pull/58))
