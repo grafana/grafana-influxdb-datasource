@@ -70,7 +70,7 @@
   },
   "engines": {
     "node": ">=24",
-    "npm": ">=11.12.1"
+    "npm": ">=11.16.0"
   },
   "dependencies": {
     "@emotion/css": "11.13.5",
