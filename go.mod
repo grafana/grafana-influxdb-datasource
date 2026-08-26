@@ -1,6 +1,6 @@
 module github.com/grafana/grafana-influxdb-datasource
 
-go 1.26.5
+go 1.26.7
 
 require (
 	github.com/apache/arrow-go/v18 v18.7.0
