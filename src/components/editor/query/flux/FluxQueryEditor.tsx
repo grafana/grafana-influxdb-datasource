@@ -92,7 +92,7 @@ v1.tagValues(
   },
 ];
 
-export const FluxQueryEditor = memo(function FluxQueryEditor({ query, onChange }: Props) {
+const FluxQueryEditor = memo(function FluxQueryEditor({ query, onChange }: Props) {
   const styles = useStyles2(getStyles);
 
   function onFluxQueryChange(q: string) {
@@ -189,6 +189,8 @@ export const FluxQueryEditor = memo(function FluxQueryEditor({ query, onChange }
     </>
   );
 });
+
+export default FluxQueryEditor;
 
 const getStyles = (theme: GrafanaTheme2) => ({
   editorContainerStyles: css({

@@ -6,7 +6,7 @@ import { InlineFormLabel, Input, Stack } from '@grafana/ui';
 import type InfluxDatasource from '../../../datasource';
 import { type InfluxOptions, type InfluxQuery } from '../../../types';
 
-export const AnnotationEditor = (props: QueryEditorProps<InfluxDatasource, InfluxQuery, InfluxOptions>) => {
+const AnnotationEditor = (props: QueryEditorProps<InfluxDatasource, InfluxQuery, InfluxOptions>) => {
   const { query, onChange } = props;
   const [eventQuery, setEventQuery] = useState<string>(query.query ?? '');
 
@@ -84,3 +84,5 @@ export const AnnotationEditor = (props: QueryEditorProps<InfluxDatasource, Influ
     </Stack>
   );
 };
+
+export default AnnotationEditor;

@@ -2,7 +2,7 @@ import { lastValueFrom } from 'rxjs';
 
 import { type SQLQuery } from '@grafana/sql';
 
-import { FSQLEditor } from './components/editor/query/fsql/FSQLEditor';
+import { FSQLEditor } from './components/editor/lazyEditors';
 import InfluxDatasource from './datasource';
 import { getMockDSInstanceSettings, mockBackendService, mockTemplateSrv } from './mocks/datasource';
 import { mockInfluxQueryRequest } from './mocks/request';

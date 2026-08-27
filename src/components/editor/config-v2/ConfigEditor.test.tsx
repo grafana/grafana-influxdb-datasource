@@ -2,7 +2,7 @@ import '@testing-library/jest-dom';
 
 import { render, screen } from '@testing-library/react';
 
-import { ConfigEditor } from './ConfigEditor';
+import ConfigEditor from './ConfigEditor';
 import { createTestProps } from './helpers';
 
 jest.mock('./LeftSideBar', () => ({

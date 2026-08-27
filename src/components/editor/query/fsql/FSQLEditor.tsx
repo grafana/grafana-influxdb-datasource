@@ -14,12 +14,7 @@ interface Props {
   datasource: InfluxDatasource;
 }
 
-export const FSQLEditor = memo(function FSQLEditor({
-  query,
-  onRunQuery,
-  onChange,
-  datasource: influxDatasource,
-}: Props) {
+const FSQLEditor = memo(function FSQLEditor({ query, onRunQuery, onChange, datasource: influxDatasource }: Props) {
   const datasource = useMemo(
     () =>
       new FlightSQLDatasource(
@@ -100,3 +95,5 @@ export const FSQLEditor = memo(function FSQLEditor({
     </>
   );
 });
+
+export default FSQLEditor;

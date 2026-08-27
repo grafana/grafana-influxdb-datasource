@@ -11,7 +11,7 @@ import { UrlAndAuthenticationSection } from './UrlAndAuthenticationSection';
 import { CONTAINER_MIN_WIDTH } from './constants';
 import { type Props } from './types';
 
-export const ConfigEditor: React.FC<Props> = (props: Props) => {
+const ConfigEditor: React.FC<Props> = (props: Props) => {
   const { onOptionsChange, options } = props;
   const styles = useStyles2(getStyles);
 
@@ -43,6 +43,8 @@ export const ConfigEditor: React.FC<Props> = (props: Props) => {
     </Stack>
   );
 };
+
+export default ConfigEditor;
 
 const getStyles = (theme: GrafanaTheme2) => {
   return {

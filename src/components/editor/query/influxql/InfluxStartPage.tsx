@@ -1,5 +1,7 @@
 import { InfluxCheatSheet } from './InfluxCheatSheet';
 
-export function InfluxStartPage() {
+function InfluxStartPage() {
   return <InfluxCheatSheet />;
 }
+
+export default InfluxStartPage;
