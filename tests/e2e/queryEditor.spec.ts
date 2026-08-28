@@ -31,35 +31,12 @@ async function switchEditorMode(page: Page, mode: 'Builder' | 'Code'): Promise<v
   }
   await target.click();
   if (mode === 'Builder') {
-    const discardButton = page.getByRole('button', { name: 'Discard code and switch' })
+    const discardButton = page.getByRole('button', { name: 'Discard code and switch' });
     if (await discardButton.isVisible({ timeout: 3000 }).catch(() => false)) {
       await discardButton.click();
     }
   }
   await expect(target).toBeChecked();
-}
-
-// Read the /api/ds/query response body inside the waitForQueryDataResponse predicate
-// to avoid CDP buffer eviction after the promise resolves.
-// TODO: remove once @grafana/plugin-e2e exposes body reading natively.
-async function waitForQueryDataBody(explorePage: {
-  waitForQueryDataResponse: (
-    cb?: (r: { ok(): boolean; json(): Promise<unknown> }) => boolean | Promise<boolean>
-  ) => Promise<unknown>;
-}): Promise<{ responsePromise: Promise<unknown>; getBody: () => unknown }> {
-  let body: unknown = null;
-  const responsePromise = explorePage.waitForQueryDataResponse(async (r) => {
-    if (!r.ok()) {
-      return false;
-    }
-    const b = await r.json().catch(() => null);
-    if (!Array.isArray((b as any)?.results?.A?.frames)) {
-      return false;
-    }
-    body = b;
-    return true;
-  });
-  return { responsePromise, getBody: () => body };
 }
 
 test.describe('Query editor', () => {

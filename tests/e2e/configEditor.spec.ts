@@ -1,6 +1,6 @@
 import { expect, test } from '@grafana/plugin-e2e';
 
-import { InfluxOptions } from '../../src/types';
+import type { InfluxOptions } from '../../src/types';
 
 const PLUGIN_TYPE = 'influxdb';
 const PROVISIONED_FILE = 'datasources.yml';
