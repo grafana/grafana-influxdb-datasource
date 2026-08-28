@@ -43,7 +43,7 @@ services:
   # InfluxDB 1.x (InfluxQL). Auth disabled by default in the OSS 1.x image.
   # ---------------------------------------------------------------------------
   influxdb1:
-    image: influxdb:1.11
+    image: influxdb:2.9@sha256:f75e48af0598e8aec7986e991a848d19a119101a7d563a2e5db1dfaac9c45daa
     ports:
       - 8086:8086/tcp
     healthcheck:
