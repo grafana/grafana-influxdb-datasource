@@ -4,6 +4,8 @@ services:
       file: .config/docker-compose-base.yaml
       service: grafana
     environment:
+      GF_FEATURE_TOGGLES_newInfluxDSConfigPageDesign: 'true'
+      GF_FEATURE_TOGGLES_influxDBConfigValidation: 'true'
       # Grafana 13 enables splashScreen by default; the overlay blocks Playwright interactions.
       GF_FEATURE_TOGGLES_splashScreen: 'false'
       # On slow CI runners, concurrent startup writes to sqlite can fail
