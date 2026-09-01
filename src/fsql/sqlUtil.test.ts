@@ -1,5 +1,10 @@
 import { QueryEditorExpressionType, type SQLQuery } from '@grafana/sql';
 
+// QueryEditorPropertyType is not exported from @grafana/sql, so the enum
+// value is derived from the groupBy property type.
+type PropertyType = NonNullable<NonNullable<SQLQuery['sql']>['groupBy']>[number]['property']['type'];
+const propertyTypeString = 'string' as PropertyType;
+
 import { toRawSql } from './sqlUtil';
 
 describe('toRawSql', () => {
@@ -77,6 +82,115 @@ describe('toRawSql', () => {
     };
     const result = toRawSql(testQuery);
     expect(result).toEqual(expected);
+  });
+
+  it('should quote a table name containing dots exactly once', () => {
+    const expected =
+      'SELECT "host" FROM "Windows.PerfCounters.Memory" WHERE "time" >= $__timeFrom AND "time" <= $__timeTo LIMIT 50';
+    const testQuery: SQLQuery = {
+      refId: 'A',
+      sql: {
+        limit: 50,
+        columns: [
+          {
+            parameters: [{ name: 'host', type: QueryEditorExpressionType.FunctionParameter }],
+            type: QueryEditorExpressionType.Function,
+          },
+        ],
+      },
+      dataset: 'iox',
+      table: 'Windows.PerfCounters.Memory',
+    };
+    expect(toRawSql(testQuery)).toEqual(expected);
+  });
+
+  it('should not double-quote a table value saved with quotes', () => {
+    const expected =
+      'SELECT "host" FROM "Windows.PerfCounters.Memory" WHERE "time" >= $__timeFrom AND "time" <= $__timeTo LIMIT 50';
+    const testQuery: SQLQuery = {
+      refId: 'A',
+      sql: {
+        limit: 50,
+        columns: [
+          {
+            parameters: [{ name: 'host', type: QueryEditorExpressionType.FunctionParameter }],
+            type: QueryEditorExpressionType.Function,
+          },
+        ],
+      },
+      dataset: 'iox',
+      table: '"Windows.PerfCounters.Memory"',
+    };
+    expect(toRawSql(testQuery)).toEqual(expected);
+  });
+
+  it('should pass a schema-qualified quoted table through unchanged, without a time filter', () => {
+    const expected = 'SELECT "duration" FROM "system"."queries" LIMIT 50';
+    const testQuery: SQLQuery = {
+      refId: 'A',
+      sql: {
+        limit: 50,
+        columns: [
+          {
+            parameters: [{ name: 'duration', type: QueryEditorExpressionType.FunctionParameter }],
+            type: QueryEditorExpressionType.Function,
+          },
+        ],
+      },
+      dataset: 'iox',
+      table: '"system"."queries"',
+    };
+    expect(toRawSql(testQuery)).toEqual(expected);
+  });
+
+  it('should quote GROUP BY and ORDER BY columns exactly once', () => {
+    const expected =
+      'SELECT "host" FROM "cpu" WHERE "time" >= $__timeFrom AND "time" <= $__timeTo GROUP BY "my/group" ORDER BY "my/order" DESC LIMIT 50';
+    const testQuery: SQLQuery = {
+      refId: 'A',
+      sql: {
+        limit: 50,
+        columns: [
+          {
+            parameters: [{ name: 'host', type: QueryEditorExpressionType.FunctionParameter }],
+            type: QueryEditorExpressionType.Function,
+          },
+        ],
+        groupBy: [
+          {
+            type: QueryEditorExpressionType.GroupBy,
+            property: { type: propertyTypeString, name: '"my/group"' },
+          },
+        ],
+        orderBy: {
+          type: QueryEditorExpressionType.Property,
+          property: { type: propertyTypeString, name: '"my/order"' },
+        },
+        orderByDirection: 'DESC',
+      },
+      dataset: 'iox',
+      table: 'cpu',
+    };
+    expect(toRawSql(testQuery)).toEqual(expected);
+  });
+
+  it('should not double-quote a column name saved with quotes', () => {
+    const expected = 'SELECT "my/field" FROM "cpu" WHERE "time" >= $__timeFrom AND "time" <= $__timeTo LIMIT 50';
+    const testQuery: SQLQuery = {
+      refId: 'A',
+      sql: {
+        limit: 50,
+        columns: [
+          {
+            parameters: [{ name: '"my/field"', type: QueryEditorExpressionType.FunctionParameter }],
+            type: QueryEditorExpressionType.Function,
+          },
+        ],
+      },
+      dataset: 'iox',
+      table: 'cpu',
+    };
+    expect(toRawSql(testQuery)).toEqual(expected);
   });
 
   it('should not wrap * with quote', () => {
