@@ -314,6 +314,46 @@ func TestInfluxdbQueryBuilder(t *testing.T) {
 	})
 }
 
+func TestRenderTagsStringEscaping(t *testing.T) {
+	cases := []struct {
+		name     string
+		tag      *Tag
+		expected string
+	}{
+		{
+			name:     "apostrophe in tag value with = operator",
+			tag:      &Tag{Key: "deviceName::tag", Operator: "=", Value: "Syl's bedroom thermostat"},
+			expected: `"deviceName"::tag = 'Syl\'s bedroom thermostat'`,
+		},
+		{
+			name:     "apostrophe in tag value with Is operator",
+			tag:      &Tag{Key: "deviceName::tag", Operator: "Is", Value: "Syl's bedroom thermostat"},
+			expected: `"deviceName"::tag = 'Syl\'s bedroom thermostat'`,
+		},
+		{
+			name:     "apostrophe in field value with Is operator",
+			tag:      &Tag{Key: "deviceName", Operator: "Is", Value: "Syl's bedroom thermostat"},
+			expected: `"deviceName" = 'Syl\'s bedroom thermostat'`,
+		},
+		{
+			name:     "backslash in tag value is still escaped",
+			tag:      &Tag{Key: "path::tag", Operator: "=", Value: `C:\temp`},
+			expected: `"path"::tag = 'C:\\temp'`,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			rendered := strings.Join(renderTags([]*Tag{c.tag}), "")
+			require.Equal(t, c.expected, rendered)
+
+			statement := fmt.Sprintf(`SELECT "value" FROM "measurement" WHERE %s`, rendered)
+			_, err := influxql.ParseStatement(statement)
+			require.NoError(t, err)
+		})
+	}
+}
+
 func TestRemoveRegexWrappers(t *testing.T) {
 	t.Run("remove regex wrappers", func(t *testing.T) {
 		wrappedText := `/^someValue$/`
