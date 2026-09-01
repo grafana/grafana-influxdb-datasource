@@ -37,6 +37,11 @@ l1Fields:
 				return rsp
 			}
 		case "error":
+			// A top-level error can arrive before any "results" field, in
+			// which case rsp has not been created yet.
+			if rsp == nil {
+				rsp = &backend.DataResponse{}
+			}
 			v, err := iter.ReadString()
 			if err != nil {
 				rsp.Error = err
