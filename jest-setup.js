@@ -1,6 +1,5 @@
 import React from 'react';
 import './.config/jest-setup';
-import { matchers } from './src/test/matchers';
 import { MessageChannel } from 'worker_threads';
 
 global.React = React;
@@ -53,8 +52,6 @@ HTMLCanvasElement.prototype.getContext = jest.fn(() => ({
   translate: jest.fn(),
   drawImage: jest.fn(),
 }));
-
-expect.extend(matchers);
 
 // jsdom doesn't apply user-agent stylesheets, so getComputedStyle(el).display returns ""
 // for all elements. dom-accessibility-api uses this to decide whether to add a space
