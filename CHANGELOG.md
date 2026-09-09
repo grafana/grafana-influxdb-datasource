@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.1.3
+
+- Update dependencies
+
 ## 13.1.2
 
 - Bump go v1.26.7 and grafana-plugin-sdk-go v0.296.4 ([#72](https://github.com/grafana/grafana-influxdb-datasource/pull/72))
