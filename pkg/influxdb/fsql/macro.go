@@ -2,8 +2,10 @@ package fsql
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/grafana/grafana-plugin-sdk-go/backend/gtime"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 )
 
@@ -27,6 +29,13 @@ func macroTimeGroup(query *sqlutil.Query, args []string) (string, error) {
 	}
 
 	column := args[0]
+
+	// $__interval or a duration literal buckets the column like $__dateBin.
+	// The macro engine applies timeGroup before interval, so a nested
+	// $__interval arrives here uninterpolated.
+	if interval, ok := parseIntervalArg(query, args[1]); ok {
+		return renderDateBin(interval, column, ""), nil
+	}
 
 	res := ""
 	switch args[1] {
@@ -55,6 +64,10 @@ func macroTimeGroupAlias(query *sqlutil.Query, args []string) (string, error) {
 	}
 
 	column := args[0]
+
+	if interval, ok := parseIntervalArg(query, args[1]); ok {
+		return renderDateBin(interval, column, fmt.Sprintf(" as %s_binned", column)), nil
+	}
 
 	res := ""
 	switch args[1] {
@@ -103,6 +116,23 @@ func macroDateBin(suffix string) sqlutil.MacroFunc {
 			}
 			return fmt.Sprintf(" as %s%s", column, suffix)
 		}()
-		return fmt.Sprintf("date_bin(interval '%d second', %s, timestamp '1970-01-01T00:00:00Z')%s", int64(query.Interval.Seconds()), column, aliasing), nil
+		return renderDateBin(query.Interval, column, aliasing), nil
 	}
+}
+
+func renderDateBin(interval time.Duration, column string, aliasing string) string {
+	return fmt.Sprintf("date_bin(interval '%d second', %s, timestamp '1970-01-01T00:00:00Z')%s", int64(interval.Seconds()), column, aliasing)
+}
+
+// parseIntervalArg resolves a timeGroup interval argument that is either the
+// uninterpolated $__interval macro or a duration literal such as '5m'.
+func parseIntervalArg(query *sqlutil.Query, arg string) (time.Duration, bool) {
+	arg = strings.Trim(arg, `'"`)
+	if arg == "$__interval" {
+		return query.Interval, true
+	}
+	if duration, err := gtime.ParseDuration(arg); err == nil {
+		return duration, true
+	}
+	return 0, false
 }

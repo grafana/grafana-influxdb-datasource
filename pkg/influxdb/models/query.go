@@ -142,7 +142,7 @@ func renderTags(tags []*Tag) []string {
 
 			// Always quote tag values
 			if strings.HasSuffix(tag.Key, "::tag") {
-				textValue = fmt.Sprintf("'%s'", strings.ReplaceAll(tag.Value, `\`, `\\`))
+				textValue = fmt.Sprintf("'%s'", escapeStringValue(tag.Value))
 				return textValue, operator
 			}
 
@@ -155,7 +155,7 @@ func renderTags(tags []*Tag) []string {
 				textValue = tag.Value
 			} else {
 				// String (or unknown) - quote
-				textValue = fmt.Sprintf("'%s'", strings.ReplaceAll(tag.Value, `\`, `\\`))
+				textValue = fmt.Sprintf("'%s'", escapeStringValue(tag.Value))
 			}
 
 			return removeRegexWrappers(textValue, `'`), operator
@@ -171,7 +171,7 @@ func renderTags(tags []*Tag) []string {
 		case "Is", "Is Not":
 			textValue, tag.Operator = isOperatorTypeHandler(tag)
 		default:
-			textValue = fmt.Sprintf("'%s'", strings.ReplaceAll(removeRegexWrappers(tag.Value, ""), `\`, `\\`))
+			textValue = fmt.Sprintf("'%s'", escapeStringValue(removeRegexWrappers(tag.Value, "")))
 		}
 
 		escapedKey := fmt.Sprintf(`"%s"`, tag.Key)
@@ -301,6 +301,12 @@ func epochMStoInfluxTime(tr *backend.TimeRange) (string, string) {
 	to := tr.To.UnixNano() / int64(time.Millisecond)
 
 	return fmt.Sprintf("%dms", from), fmt.Sprintf("%dms", to)
+}
+
+// escapeStringValue escapes characters that would terminate or corrupt a
+// single-quoted InfluxQL string literal.
+func escapeStringValue(value string) string {
+	return strings.NewReplacer(`\`, `\\`, `'`, `\'`).Replace(value)
 }
 
 func removeRegexWrappers(wrappedValue string, wrapper string) string {
