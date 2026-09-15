@@ -32,9 +32,7 @@ import {
 } from '@grafana/runtime';
 import { QueryFormat, type SQLQuery } from '@grafana/sql';
 
-import { AnnotationEditor } from './components/editor/annotation/AnnotationEditor';
-import { FluxQueryEditor } from './components/editor/query/flux/FluxQueryEditor';
-import { FSQLEditor } from './components/editor/query/fsql/FSQLEditor';
+import { AnnotationEditor, FluxQueryEditor, FSQLEditor } from './components/editor/lazyEditors';
 import { BROWSER_MODE_DISABLED_MESSAGE } from './constants';
 import { toRawSql } from './fsql/sqlUtil';
 import InfluxQueryModel from './influx_query_model';

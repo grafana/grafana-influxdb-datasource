@@ -43,7 +43,7 @@ const versions: Array<SelectableValue<InfluxVersion>> = [
 
 export type Props = DataSourcePluginOptionsEditorProps<InfluxOptions>;
 
-export const ConfigEditor = memo(function ConfigEditor(props: Props) {
+const ConfigEditor = memo(function ConfigEditor(props: Props) {
   const { options, onOptionsChange } = props;
   const [maxSeries, setMaxSeries] = useState(options.jsonData.maxSeries?.toString() || '');
 
@@ -143,3 +143,5 @@ export const ConfigEditor = memo(function ConfigEditor(props: Props) {
     </>
   );
 });
+
+export default ConfigEditor;

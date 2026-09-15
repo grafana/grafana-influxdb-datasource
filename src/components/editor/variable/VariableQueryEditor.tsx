@@ -3,7 +3,7 @@ import { InlineField, InlineFieldRow, Input, TextArea } from '@grafana/ui';
 
 import type InfluxDatasource from '../../../datasource';
 import { type InfluxOptions, type InfluxQuery, type InfluxVariableQuery, InfluxVersion } from '../../../types';
-import { FluxQueryEditor } from '../query/flux/FluxQueryEditor';
+import { FluxQueryEditor } from '../lazyEditors';
 
 type Props = QueryEditorProps<InfluxDatasource, InfluxQuery, InfluxOptions, InfluxVariableQuery>;
 
