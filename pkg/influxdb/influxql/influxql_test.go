@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,7 +25,7 @@ func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
-func TestQuery_httpConnectionFailureIsDownstream(t *testing.T) {
+func TestExecutorExecute_httpConnectionFailureIsDownstream(t *testing.T) {
 	// Simulate a transport-level failure (e.g. a TLS handshake error) from
 	// the request to the InfluxDB /query endpoint.
 	connErr := errors.New("remote error: tls: internal error")
@@ -45,21 +46,68 @@ func TestQuery_httpConnectionFailureIsDownstream(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	req := &backend.QueryDataRequest{
-		Queries: []backend.DataQuery{
-			{RefID: "A", JSON: queryJSON},
-		},
+	executor, err := NewExecutor(context.Background(), nil, dsInfo)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, executor.Close()) })
+
+	res := executor.Execute(context.Background(), backend.DataQuery{
+		RefID: "A",
+		JSON:  queryJSON,
+	})
+
+	require.Error(t, res.Error)
+	assert.ErrorContains(t, res.Error, connErr.Error())
+	assert.Equal(t, backend.ErrorSourceDownstream, res.ErrorSource)
+}
+
+type staticRoundTripper struct {
+	body   string
+	status int
+}
+
+func (s *staticRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: s.status,
+		Body:       io.NopCloser(strings.NewReader(s.body)),
+		Header:     http.Header{},
+	}, nil
+}
+
+func TestExecutorExecute(t *testing.T) {
+	body := `{"results":[{"statement_id":0,"series":[{"name":"cpu","columns":["time","value"],"values":[[1622505600000,42]]}]}]}`
+	dsInfo := &models.DatasourceInfo{
+		URL:        "http://influx.example",
+		DbName:     "fixtures",
+		HTTPMode:   "POST",
+		HTTPClient: &http.Client{Transport: &staticRoundTripper{body: body, status: http.StatusOK}},
 	}
 
-	res, err := Query(context.Background(), nil, dsInfo, req)
+	executor, err := NewExecutor(context.Background(), nil, dsInfo)
 	require.NoError(t, err)
-	require.NotNil(t, res)
+	t.Cleanup(func() { require.NoError(t, executor.Close()) })
 
-	dr, ok := res.Responses["A"]
-	require.True(t, ok, "expected a response for RefID A")
-	require.Error(t, dr.Error)
-	assert.ErrorContains(t, dr.Error, connErr.Error())
-	assert.Equal(t, backend.ErrorSourceDownstream, dr.ErrorSource)
+	res := executor.Execute(context.Background(), backend.DataQuery{
+		RefID: "A",
+		JSON:  []byte(`{"query": "SELECT value FROM cpu", "rawQuery": true}`),
+	})
+
+	require.NoError(t, res.Error)
+	require.NotEmpty(t, res.Frames)
+}
+
+func TestExecutorExecuteBadQueryJSON(t *testing.T) {
+	dsInfo := &models.DatasourceInfo{
+		URL:        "http://influx.example",
+		HTTPMode:   "POST",
+		HTTPClient: &http.Client{Transport: &staticRoundTripper{body: "{}", status: http.StatusOK}},
+	}
+	executor, err := NewExecutor(context.Background(), nil, dsInfo)
+	require.NoError(t, err)
+
+	res := executor.Execute(context.Background(), backend.DataQuery{RefID: "A", JSON: []byte(`{invalid`)})
+
+	require.Error(t, res.Error)
+	require.Equal(t, backend.ErrorSourceDownstream, res.ErrorSource)
 }
 
 func TestExecutor_createRequest(t *testing.T) {
