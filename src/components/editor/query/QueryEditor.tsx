@@ -6,15 +6,15 @@ import type InfluxDatasource from '../../../datasource';
 import { buildRawQuery } from '../../../queryUtils';
 import { type InfluxOptions, type InfluxQuery, InfluxVersion } from '../../../types';
 
-import { FluxQueryEditor } from './flux/FluxQueryEditor';
-import { FSQLEditor } from './fsql/FSQLEditor';
+import FluxQueryEditor from './flux/FluxQueryEditor';
+import FSQLEditor from './fsql/FSQLEditor';
 import { QueryEditorModeSwitcher } from './influxql/QueryEditorModeSwitcher';
 import { RawInfluxQLEditor } from './influxql/code/RawInfluxQLEditor';
 import { VisualInfluxQLEditor as VisualInfluxQLEditor } from './influxql/visual/VisualInfluxQLEditor';
 
-type Props = QueryEditorProps<InfluxDatasource, InfluxQuery, InfluxOptions>;
+export type Props = QueryEditorProps<InfluxDatasource, InfluxQuery, InfluxOptions>;
 
-export const QueryEditor = ({ query, onChange, onRunQuery, datasource }: Props) => {
+const QueryEditor = ({ query, onChange, onRunQuery, datasource }: Props) => {
   switch (datasource.version) {
     case InfluxVersion.Flux:
       return (
@@ -46,3 +46,5 @@ export const QueryEditor = ({ query, onChange, onRunQuery, datasource }: Props) 
       );
   }
 };
+
+export default QueryEditor;
