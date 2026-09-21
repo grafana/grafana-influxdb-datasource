@@ -12,6 +12,9 @@ import (
 
 // fakeRow is one Next() step of a fakeTableResult.
 type fakeRow struct {
+	// tableChanged mirrors QueryTableResult.TableChanged(), which the CSV
+	// parser sets only when a new annotation header arrives. Same-schema
+	// tables share one header, so the builder must split them on group key.
 	tableChanged bool
 	metadata     *query.FluxTableMetadata
 	record       *query.FluxRecord
@@ -70,11 +73,21 @@ func TestParseResponse(t *testing.T) {
 		wantSource backend.ErrorSource
 	}{
 		{
-			name: "groups rows into one frame per table",
+			name: "splits frames on group key change within one annotation block",
 			result: &fakeTableResult{rows: []fakeRow{
 				{tableChanged: true, metadata: simpleMetadata(), record: simpleRecord("a", 1)},
 				{record: simpleRecord("a", 2)},
 				{record: simpleRecord("b", 3)},
+			}},
+			query:      queryModel{MaxDataPoints: 100},
+			maxSeries:  10,
+			wantFrames: 2,
+		},
+		{
+			name: "flushes frames when a new annotation header arrives",
+			result: &fakeTableResult{rows: []fakeRow{
+				{tableChanged: true, metadata: simpleMetadata(), record: simpleRecord("a", 1)},
+				{tableChanged: true, metadata: simpleMetadata(), record: simpleRecord("b", 2)},
 			}},
 			query:      queryModel{MaxDataPoints: 100},
 			maxSeries:  10,
