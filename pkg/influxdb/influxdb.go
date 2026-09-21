@@ -29,6 +29,12 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		return nil, err
 	}
 
+	// External plugins must opt in to header forwarding. Keep ContextualMiddleware
+	// where the SDK puts it; apply InfluxQL Basic Auth only after forwarded
+	// headers so OAuth wins for user queries.
+	opts.ForwardHTTPHeaders = true
+	opts.ConfigureMiddleware = basicAuthAfterForwardedHeaders
+
 	client, err := httpclient.NewProvider().New(opts)
 	if err != nil {
 		return nil, err
