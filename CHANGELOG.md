@@ -1,5 +1,10 @@
 # Changelog
 
+## 13.1.4
+
+- Forward OAuth Identity for InfluxQL queries ([#92](https://github.com/grafana/grafana-influxdb-datasource/pull/92))
+- Remove dead frontend code ([#61](https://github.com/grafana/grafana-influxdb-datasource/pull/61))
+
 ## 13.1.3
 
 - Update dependencies
