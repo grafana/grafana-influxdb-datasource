@@ -136,10 +136,6 @@ func backendStatus(code codes.Code) (backend.Status, bool) {
 	}
 }
 
-type runner struct {
-	client *client
-}
-
 func ParseURL(endpoint string) (string, error) {
 	if endpoint == "" {
 		return "", fmt.Errorf("missing URL from datasource configuration")
