@@ -109,37 +109,30 @@ func errorResponse(err error) backend.DataResponse {
 	if !ok {
 		return backend.ErrDataResponse(backend.StatusInternal, errStr)
 	}
-	switch grpcStatusErr.Code() {
-	case codes.InvalidArgument:
-		return backend.ErrDataResponseWithSource(backend.StatusBadRequest, backend.ErrorSourceDownstream, errStr)
-	case codes.PermissionDenied:
-		return backend.ErrDataResponseWithSource(backend.StatusForbidden, backend.ErrorSourceDownstream, errStr)
-	case codes.NotFound:
-		return backend.ErrDataResponseWithSource(backend.StatusNotFound, backend.ErrorSourceDownstream, errStr)
-	case codes.Unavailable:
-		return backend.ErrDataResponseWithSource(http.StatusServiceUnavailable, backend.ErrorSourceDownstream, errStr)
-	case codes.Unauthenticated:
-		return backend.ErrDataResponseWithSource(backend.StatusUnauthorized, backend.ErrorSourceDownstream, errStr)
-	default:
+	st, mapped := backendStatus(grpcStatusErr.Code())
+	if !mapped {
 		return backend.ErrDataResponse(backend.StatusInternal, errStr)
 	}
+	return backend.ErrDataResponseWithSource(st, backend.ErrorSourceDownstream, errStr)
 }
 
-// backendStatus maps a gRPC status code to a backend plugin status.
-func backendStatus(code codes.Code) backend.Status {
+// backendStatus maps a gRPC status code to a backend plugin status. The
+// second return reports whether the code mapped to a specific status;
+// unrecognised codes fall back to StatusInternal.
+func backendStatus(code codes.Code) (backend.Status, bool) {
 	switch code {
 	case codes.InvalidArgument:
-		return backend.StatusBadRequest
+		return backend.StatusBadRequest, true
 	case codes.PermissionDenied:
-		return backend.StatusForbidden
+		return backend.StatusForbidden, true
 	case codes.NotFound:
-		return backend.StatusNotFound
+		return backend.StatusNotFound, true
 	case codes.Unavailable:
-		return backend.Status(http.StatusServiceUnavailable)
+		return backend.Status(http.StatusServiceUnavailable), true
 	case codes.Unauthenticated:
-		return backend.StatusUnauthorized
+		return backend.StatusUnauthorized, true
 	default:
-		return backend.StatusInternal
+		return backend.StatusInternal, false
 	}
 }
 
