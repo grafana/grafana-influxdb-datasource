@@ -42,36 +42,13 @@ import InfluxSeries from './influx_series';
 import { buildMetadataQuery } from './influxql_query_builder';
 import { prepareAnnotation } from './migrations';
 import { buildRawQuery, removeRegexWrapper } from './queryUtils';
+import { isVariableInRegexLiteral } from './regexLiterals';
 import ResponseParser from './response_parser';
 import { DEFAULT_POLICY, type InfluxOptions, type InfluxQuery, type InfluxVariableQuery, InfluxVersion } from './types';
 import { InfluxVariableSupport } from './variables';
 
-/**
- * Decides whether a variable is referenced inside a regex literal in the
- * given query text. InfluxQL and Flux regex literals only appear after the
- * `=~` and `!~` operators or in a FROM clause, or the interpolated field is
- * itself a lone regex (a query-builder tag value or measurement such as
- * `/^$var$/`). A `/` anywhere else (e.g. division) does not open a regex.
- */
-export function isVariableInRegexLiteral(name: string, query: string): boolean {
-  const escapedName = escapeRegex(name);
-  // Matches $name and ${name} / ${name:format} references
-  const varRef = new RegExp(`\\$(?:${escapedName}\\b|\\{${escapedName}(?::[^}]*)?\\})`);
-  const literals: string[] = [];
-
-  const trimmed = query.trim();
-  if (trimmed.length > 1 && trimmed.startsWith('/') && trimmed.endsWith('/')) {
-    literals.push(trimmed.slice(1, -1));
-  }
-
-  // Regex literals anchored by an operator or FROM (with optional retention policy)
-  const anchoredLiteral = /(?:=~|!~|\bfrom\b(?:\s*"[^"]*"\s*\.)?)\s*\/((?:[^/\\]|\\.)*)\//gi;
-  for (const match of query.matchAll(anchoredLiteral)) {
-    literals.push(match[1]);
-  }
-
-  return literals.some((literal) => varRef.test(literal));
-}
+const escapeSqlQuotes = (value: string) => value.replace(/'/g, "''");
+const quoteSqlLiteral = (value: string) => `'${escapeSqlQuotes(value)}'`;
 
 export default class InfluxDatasource extends DataSourceWithBackend<InfluxQuery, InfluxOptions> {
   type: string;
@@ -358,21 +335,21 @@ export default class InfluxDatasource extends DataSourceWithBackend<InfluxQuery,
   }
 
   interpolateQueryExpr(value: string | string[] = [], variable: QueryVariableModel, query?: string) {
-    // Numbers need no escaping in any dialect
-    if (typeof value === 'string' && !isNaN(parseFloat(value))) {
-      return value;
-    }
-
     // SQL has no regex literals, so regex escaping would corrupt values.
-    // Multiple values are quoted and comma-joined for use with IN ($var).
+    // Multi-value and include-all variables can hold several values, so they
+    // always interpolate as a quoted list for IN ($var). Other single values
+    // stay bare for = '$var', with embedded quotes doubled. This matches the
+    // other Grafana SQL data sources.
     if (this.version === InfluxVersion.SQL) {
       if (typeof value === 'string') {
-        return value;
+        return variable.multi || variable.includeAll ? quoteSqlLiteral(value) : escapeSqlQuotes(value);
       }
-      if (value.length === 1) {
-        return value[0];
-      }
-      return value.map((v) => `'${v.replace(/'/g, "''")}'`).join(', ');
+      return value.map(quoteSqlLiteral).join(', ');
+    }
+
+    // Numbers need no regex escaping
+    if (typeof value === 'string' && !isNaN(parseFloat(value))) {
+      return value;
     }
 
     // Multi-value variables always interpolate to an (a|b) alternation,

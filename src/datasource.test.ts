@@ -129,8 +129,7 @@ describe('interpolateQueryExpr', () => {
   });
 
   it('should **not** escape the value when the surrounding slashes do not delimit a regex', () => {
-    // InfluxQL regexes only appear after `=~`, `!~` or FROM, or as a
-    // whole-field value, so `path /$tempVar/` is not a regex usage
+    // A slash after an identifier is division, so `path /$tempVar/` is not a regex
     const value = '/special/path';
     const variableMock = queryBuilder().withId('tempVar').withName('tempVar').withMulti(false).build();
     const result = ds.interpolateQueryExpr(
@@ -193,13 +192,50 @@ describe('interpolateQueryExpr', () => {
     const rawSql = `SELECT "time", "percentile50_ms" FROM "ping" WHERE ("host" = '$host' AND "url" = '$url')`;
 
     it('should not regex-escape string values', () => {
-      const variableMock = queryBuilder().withId('url').withName('url').withMulti().build();
+      const variableMock = queryBuilder().withId('url').withName('url').withMulti(false).build();
       expect(dsSQL.interpolateQueryExpr('cloudflare-dns.com', variableMock, rawSql)).toBe('cloudflare-dns.com');
     });
 
-    it('should interpolate a single-selection multi variable as a bare value', () => {
-      const variableMock = queryBuilder().withId('url').withName('url').withMulti().build();
-      expect(dsSQL.interpolateQueryExpr(['cloudflare-dns.com'], variableMock, rawSql)).toBe('cloudflare-dns.com');
+    it("should double embedded quotes in single values so = '$var' stays valid", () => {
+      const variableMock = queryBuilder().withId('host').withName('host').withMulti(false).build();
+      expect(dsSQL.interpolateQueryExpr("Bob's Server", variableMock, rawSql)).toBe("Bob''s Server");
+    });
+
+    it('should quote a single-selection multi variable for use with IN', () => {
+      const variableMock = queryBuilder().withId('City').withName('City').withMulti().build();
+      const result = dsSQL.interpolateQueryExpr(
+        ['Amsterdam'],
+        variableMock,
+        `SELECT * FROM "weather" WHERE "city" IN ($City)`
+      );
+      expect(result).toBe(`'Amsterdam'`);
+    });
+
+    it('should quote a repeated-panel string value of a multi variable for use with IN', () => {
+      const variableMock = queryBuilder().withId('City').withName('City').withMulti().build();
+      const result = dsSQL.interpolateQueryExpr(
+        'Amsterdam',
+        variableMock,
+        `SELECT * FROM "weather" WHERE "city" IN ($City)`
+      );
+      expect(result).toBe(`'Amsterdam'`);
+    });
+
+    it('should quote values that start with digits for use with IN', () => {
+      const variableMock = queryBuilder().withId('ip').withName('ip').withMulti(false).withIncludeAll().build();
+      expect(dsSQL.interpolateQueryExpr('10.0.0.1', variableMock, `SELECT * FROM "hosts" WHERE "ip" IN ($ip)`)).toBe(
+        `'10.0.0.1'`
+      );
+    });
+
+    it('should double embedded quotes in values that start with digits', () => {
+      const variableMock = queryBuilder().withId('host').withName('host').withMulti(false).build();
+      expect(dsSQL.interpolateQueryExpr("5' cable", variableMock, rawSql)).toBe("5'' cable");
+    });
+
+    it('should quote a single string value of an include-all variable for use with IN', () => {
+      const variableMock = queryBuilder().withId('city').withName('city').withMulti(false).withIncludeAll().build();
+      expect(dsSQL.interpolateQueryExpr("s'Hertogenbosch", variableMock, rawSql)).toBe(`'s''Hertogenbosch'`);
     });
 
     it('should quote and comma-join multiple values for use with IN', () => {
