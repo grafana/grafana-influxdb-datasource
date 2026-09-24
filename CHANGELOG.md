@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.1.5
+
+- Report query errors instead of empty results, quote dotted table names once and make system tables queryable ([#60](https://github.com/grafana/grafana-influxdb-datasource/pull/60))
+
 ## 13.1.4
 
 - Forward OAuth Identity for InfluxQL queries ([#92](https://github.com/grafana/grafana-influxdb-datasource/pull/92))
