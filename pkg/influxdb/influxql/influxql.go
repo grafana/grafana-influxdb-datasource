@@ -31,21 +31,17 @@ var (
 	glog               = backend.NewLoggerWith("logger", "tsdb.influx_influxql")
 )
 
-// responseParser turns an InfluxQL response body into a data response. Both
-// parser packages (buffered and streaming querydata) match this signature,
-// making the parsing strategy a swappable seam.
+// responseParser is the signature shared by the buffered and streaming parsers.
 type responseParser func(io.ReadCloser, int, *models.Query) *backend.DataResponse
 
-// Executor runs InfluxQL queries for a single request. It is safe for
-// concurrent use: per-query state lives entirely inside Execute.
+// Executor runs InfluxQL queries for one request and is safe for concurrent use.
 type Executor struct {
 	dsInfo *models.DatasourceInfo
 	tracer trace.Tracer
 	parse  responseParser
 }
 
-// NewExecutor reads the request-scoped feature toggles once, selects the
-// parsing strategy for this request and returns an executor.
+// NewExecutor selects the parsing strategy from the feature toggles of the request.
 func NewExecutor(ctx context.Context, tracer trace.Tracer, dsInfo *models.DatasourceInfo) (*Executor, error) {
 	var parse responseParser = buffered.ResponseParse
 	if config.GrafanaConfigFromContext(ctx).FeatureToggles().IsEnabled("influxqlStreamingParser") {
@@ -59,9 +55,7 @@ func NewExecutor(ctx context.Context, tracer trace.Tracer, dsInfo *models.Dataso
 	}, nil
 }
 
-// Execute runs one query and returns its response. Failures are reported
-// inside the response, never as a panic, so a bad query cannot affect the
-// rest of the batch.
+// Execute runs one query and reports any failure in the returned response.
 func (e *Executor) Execute(ctx context.Context, reqQuery backend.DataQuery) backend.DataResponse {
 	logger := glog.FromContext(ctx)
 
@@ -70,9 +64,7 @@ func (e *Executor) Execute(ctx context.Context, reqQuery backend.DataQuery) back
 		return backend.DataResponse{Error: err, ErrorSource: backend.ErrorSourceDownstream}
 	}
 
-	// query.Build() unconditionally returns nil for error. Build reads the
-	// time range from Queries[0], so pass the query being executed rather
-	// than the whole batch.
+	// Build never returns an error and reads the time range from Queries[0].
 	rawQuery, _ := query.Build(&backend.QueryDataRequest{Queries: []backend.DataQuery{reqQuery}})
 
 	query.RefID = reqQuery.RefID
@@ -93,9 +85,7 @@ func (e *Executor) Execute(ctx context.Context, reqQuery backend.DataQuery) back
 	return e.parseResponse(ctx, res, query)
 }
 
-// parseResponse owns everything response-shaped: it closes the body, wraps
-// parsing in a span, applies the parsing strategy chosen at construction and
-// stamps custom metadata headers onto the first frame.
+// parseResponse parses and closes the response body.
 func (e *Executor) parseResponse(ctx context.Context, res *http.Response, query *models.Query) backend.DataResponse {
 	logger := glog.FromContext(ctx)
 	defer func() {
@@ -116,8 +106,7 @@ func (e *Executor) parseResponse(ctx context.Context, res *http.Response, query 
 	return *resp
 }
 
-// Close implements the executor contract; InfluxQL holds no per-request
-// resources beyond the shared HTTP client.
+// Close is a no-op because InfluxQL holds no per-request resources.
 func (e *Executor) Close() error {
 	return nil
 }

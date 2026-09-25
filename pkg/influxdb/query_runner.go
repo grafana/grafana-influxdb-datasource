@@ -21,13 +21,8 @@ const (
 	defaultConcurrentQueryCount = 10
 )
 
-// runQueries executes every query in req through execute and assembles the
-// responses keyed by RefID. When the influxdbRunQueriesInParallel feature
-// toggle is enabled queries run concurrently, bounded by the Grafana
-// concurrent query count; otherwise they run serially. execute must be safe
-// for concurrent use and must report failures inside the returned
-// DataResponse rather than panicking, so one failing query never affects its
-// siblings.
+// runQueries runs each query through execute, concurrently when influxdbRunQueriesInParallel is on.
+// execute must be safe for concurrent use and report failures in its response, never panic.
 func runQueries(ctx context.Context, req *backend.QueryDataRequest, execute func(context.Context, backend.DataQuery) backend.DataResponse) *backend.QueryDataResponse {
 	response := backend.NewQueryDataResponse()
 	cfg := config.GrafanaConfigFromContext(ctx)
@@ -52,8 +47,7 @@ func runQueries(ctx context.Context, req *backend.QueryDataRequest, execute func
 		responseLock.Lock()
 		defer responseLock.Unlock()
 		response.Responses[q.RefID] = res
-		// Errors are reported per query inside res; returning nil stops the
-		// errgroup from cancelling the remaining queries.
+		// A returned error cancels the remaining queries, so failures stay in res.
 		return nil
 	})
 	if err != nil {
@@ -62,8 +56,7 @@ func runQueries(ctx context.Context, req *backend.QueryDataRequest, execute func
 	return response
 }
 
-// queryExecutor executes a single query. Implementations must be safe for
-// concurrent use and report failures inside the returned response.
+// queryExecutor runs one query. It must be safe for concurrent use and report failures in the response.
 type queryExecutor interface {
 	Execute(ctx context.Context, query backend.DataQuery) backend.DataResponse
 	Close() error
@@ -83,9 +76,7 @@ func newQueryExecutor(ctx context.Context, dsInfo *models.DatasourceInfo) (query
 	}
 }
 
-// executeRequest runs every query in req through the language executor via
-// the shared fan-out. It is the single execution path for QueryData and the
-// health checks.
+// executeRequest is the single execution path for QueryData and the health checks.
 func executeRequest(ctx context.Context, dsInfo *models.DatasourceInfo, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
 	executor, err := newQueryExecutor(ctx, dsInfo)
 	if err != nil {

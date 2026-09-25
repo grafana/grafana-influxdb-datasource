@@ -26,15 +26,12 @@ type SQLOptions struct {
 	Token    string              `json:"token"`
 }
 
-// Executor runs Flight SQL queries for a single request. The underlying gRPC
-// connection multiplexes concurrent streams, and all per-query state is
-// created inside Execute, so it is safe for concurrent use.
+// Executor runs Flight SQL queries for one request and is safe for concurrent use.
 type Executor struct {
 	client *client
 }
 
-// NewExecutor validates the datasource configuration and dials the Flight
-// SQL client for this request.
+// NewExecutor validates the configuration and dials the Flight SQL client for one request.
 func NewExecutor(dsInfo *models.DatasourceInfo) (*Executor, error) {
 	if dsInfo.URL == "" {
 		return nil, fmt.Errorf("missing URL from datasource configuration")
@@ -61,8 +58,7 @@ func NewExecutor(dsInfo *models.DatasourceInfo) (*Executor, error) {
 	return &Executor{client: fsqlClient}, nil
 }
 
-// Execute runs one query and returns its response. Failures are reported
-// inside the response so a bad query cannot abandon the rest of the batch.
+// Execute runs one query and reports any failure in the returned response.
 func (e *Executor) Execute(ctx context.Context, q backend.DataQuery) backend.DataResponse {
 	logger := glog.FromContext(ctx)
 
@@ -90,17 +86,14 @@ func (e *Executor) Execute(ctx context.Context, q backend.DataQuery) backend.Dat
 	return newQueryDataResponse(reader, *qm.Query, headers)
 }
 
-// flightRunner is the slice of the Flight SQL client the run stage needs,
-// defined here so runQuery can be unit-tested with a fake client.
+// flightRunner is the subset of the Flight SQL client that runQuery uses.
 type flightRunner interface {
 	Execute(ctx context.Context, sql string, opts ...grpc.CallOption) (*flight.FlightInfo, error)
 	DoGetWithHeaderExtraction(ctx context.Context, in *flight.Ticket, opts ...grpc.CallOption) (*flightReader, error)
 }
 
-// runQuery owns the gRPC mechanics: it executes the SQL and opens the result
-// stream, mapping transport failures to data responses. A non-nil response
-// means the query failed and the reader is nil. Parsing stays in
-// newQueryDataResponse.
+// runQuery executes the SQL and opens the result stream.
+// A non-nil response means the query failed and the reader is nil.
 func runQuery(ctx context.Context, c flightRunner, sql string) (*flightReader, *backend.DataResponse) {
 	info, err := c.Execute(ctx, sql)
 	if err != nil {
@@ -125,8 +118,7 @@ func (e *Executor) Close() error {
 	return e.client.Close()
 }
 
-// errorResponse maps a Flight SQL error to a data response, preserving the
-// existing gRPC-code-to-status mapping.
+// errorResponse maps a Flight SQL error to a data response.
 func errorResponse(err error) backend.DataResponse {
 	errStr := fmt.Sprintf("flightsql: %s", err)
 	grpcStatusErr, ok := status.FromError(err)
@@ -140,9 +132,8 @@ func errorResponse(err error) backend.DataResponse {
 	return backend.ErrDataResponseWithSource(st, backend.ErrorSourceDownstream, errStr)
 }
 
-// backendStatus maps a gRPC status code to a backend plugin status. The
-// second return reports whether the code mapped to a specific status;
-// unrecognised codes fall back to StatusInternal.
+// backendStatus maps a gRPC code to a plugin status.
+// The bool is false when the code falls back to StatusInternal.
 func backendStatus(code codes.Code) (backend.Status, bool) {
 	switch code {
 	case codes.InvalidArgument:

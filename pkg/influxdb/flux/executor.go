@@ -12,10 +12,7 @@ import (
 
 const maxPointsEnforceFactor float64 = 10
 
-// executeQuery runs a flux query using the queryModel to interpolate the
-// query and the runner to execute it, then hands the result stream to
-// parseResponse. Transport failures are mapped here; everything
-// response-shaped lives on the parse side.
+// executeQuery maps transport failures itself and hands successful streams to parseResponse.
 func executeQuery(ctx context.Context, logger log.Logger, query queryModel, runner queryRunner, maxSeries int) (dr backend.DataResponse) {
 	dr = backend.DataResponse{}
 

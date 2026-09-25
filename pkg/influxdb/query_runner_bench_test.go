@@ -8,8 +8,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
 
-// benchmarkExecute simulates a query round-trip with fixed latency so the
-// benchmark isolates fan-out overhead and overlap.
+// benchmarkExecute simulates a fixed-latency round trip to isolate fan-out overhead.
 func benchmarkExecute(ctx context.Context, q backend.DataQuery) backend.DataResponse {
 	time.Sleep(5 * time.Millisecond)
 	return backend.DataResponse{}

@@ -10,9 +10,7 @@ import (
 	"github.com/influxdata/influxdb-client-go/v2/api/query"
 )
 
-// tableResult is the stream of Flux tables consumed by the parse stage. It is
-// the subset of api.QueryTableResult the frame builder needs, defined here so
-// parsing can be unit-tested with a fake stream.
+// tableResult is the subset of api.QueryTableResult that parseResponse reads.
 type tableResult interface {
 	Next() bool
 	TableChanged() bool
@@ -21,10 +19,7 @@ type tableResult interface {
 	Err() error
 }
 
-// parseResponse turns a Flux table stream into a data response. It owns
-// everything response-shaped: frame building, error sources and the
-// max-points error rewrite. Transport errors never reach it; executeQuery
-// maps those before parsing starts.
+// parseResponse turns a Flux table stream into a data response. Transport errors never reach it.
 func parseResponse(logger log.Logger, tables tableResult, query queryModel, maxSeries int) backend.DataResponse {
 	// we only enforce a larger number than maxDataPoints
 	maxPointsEnforced := int(float64(query.MaxDataPoints) * maxPointsEnforceFactor)
