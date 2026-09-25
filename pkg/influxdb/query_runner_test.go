@@ -13,8 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Key read by config.GrafanaCfg.FeatureToggles(). The SDK only exports it
-// from the experimental featuretoggles package, so it is repeated here.
+// The SDK exports this key only from experimental/featuretoggles, so it is repeated here.
 const enabledFeaturesKey = "GF_INSTANCE_FEATURE_TOGGLES_ENABLE"
 
 func parallelContext(limit int) context.Context {

@@ -12,17 +12,14 @@ import (
 
 // fakeRow is one Next() step of a fakeTableResult.
 type fakeRow struct {
-	// tableChanged mirrors QueryTableResult.TableChanged(), which the CSV
-	// parser sets only when a new annotation header arrives. Same-schema
-	// tables share one header, so the builder must split them on group key.
+	// TableChanged() fires only on a new annotation header, and same-schema tables share one,
+	// so the builder must also split tables on group key.
 	tableChanged bool
 	metadata     *query.FluxTableMetadata
 	record       *query.FluxRecord
 }
 
-// fakeTableResult drives parseResponse through arbitrary stream shapes,
-// including ones the CSV parser can never produce, without a client or an
-// HTTP server.
+// fakeTableResult feeds parseResponse stream shapes that the CSV parser cannot produce.
 type fakeTableResult struct {
 	rows []fakeRow
 	pos  int
@@ -42,8 +39,7 @@ func (f *fakeTableResult) TableMetadata() *query.FluxTableMetadata { return f.ro
 func (f *fakeTableResult) Record() *query.FluxRecord               { return f.rows[f.pos-1].record }
 func (f *fakeTableResult) Err() error                              { return f.err }
 
-// simpleMetadata describes the usual _time/_value shape with one group
-// column ("host") whose value changes start a new table.
+// simpleMetadata is a _time/_value shape grouped on host.
 func simpleMetadata() *query.FluxTableMetadata {
 	return query.NewFluxTableMetadataFull(0, []*query.FluxColumn{
 		query.NewFluxColumnFull(stringDatatype, "", "result", false, 0),

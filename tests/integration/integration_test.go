@@ -1,7 +1,5 @@
-// Package integration exercises the full backend QueryData path against the
-// real InfluxDB version matrix from docker-compose.yaml. Tests skip when the
-// stack is not running, per docs/testing/integration-testing.md in the
-// data-sources repository.
+// Package integration runs QueryData against the docker-compose InfluxDB version matrix.
+// Tests skip when the stack is not running.
 package integration
 
 import (
@@ -19,8 +17,7 @@ import (
 	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb"
 )
 
-// Key read by config.GrafanaCfg.FeatureToggles(); only exported from the
-// SDK's experimental featuretoggles package, so repeated here.
+// The SDK exports this key only from experimental/featuretoggles, so it is repeated here.
 const enabledFeaturesKey = "GF_INSTANCE_FEATURE_TOGGLES_ENABLE"
 
 // Fixture window, see tests/fixtures/README.md.
@@ -105,8 +102,7 @@ func sqlQuery(refID, q string) backend.DataQuery {
 
 // instances mirrors provisioning/datasources/datasources.yml.
 func instances(t *testing.T) []instance {
-	// The sensor fixture only has readings_temperatureCelsius (see
-	// tests/fixtures/sensor.lp); there is no bare "temperature" field.
+	// tests/fixtures/sensor.lp has readings_temperatureCelsius and no bare temperature field.
 	timeFilter := "time >= '2026-06-01T00:00:00Z' AND time < '2026-06-01T04:00:00Z'"
 	influxqlBatch := []backend.DataQuery{
 		influxqlQuery("A", fmt.Sprintf(`SELECT count("readings_temperatureCelsius") FROM "sensor" WHERE %s`, timeFilter)),

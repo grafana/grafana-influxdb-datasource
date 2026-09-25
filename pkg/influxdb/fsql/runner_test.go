@@ -13,8 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// fakeFlightClient drives runQuery through its error paths without a Flight
-// SQL server.
+// fakeFlightClient drives runQuery through its error paths.
 type fakeFlightClient struct {
 	executeInfo *flight.FlightInfo
 	executeErr  error

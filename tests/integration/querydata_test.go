@@ -95,8 +95,7 @@ func TestIntegrationCancellationReturnsPromptly(t *testing.T) {
 			done := make(chan struct{})
 			go func() {
 				defer close(done)
-				// A cancelled request must return promptly; the responses
-				// themselves are unspecified (typically per-query errors).
+				// A canceled request must return promptly. Its responses are unspecified.
 				_, _ = ds.QueryData(ctx, &backend.QueryDataRequest{Queries: inst.queries})
 			}()
 

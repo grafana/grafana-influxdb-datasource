@@ -37,8 +37,7 @@ l1Fields:
 				return rsp
 			}
 		case "error":
-			// A top-level error can arrive before any "results" field, in
-			// which case rsp has not been created yet.
+			// A top-level error can precede "results", so rsp can still be nil here.
 			if rsp == nil {
 				rsp = &backend.DataResponse{}
 			}
