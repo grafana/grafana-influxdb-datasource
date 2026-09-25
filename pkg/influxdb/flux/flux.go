@@ -15,33 +15,41 @@ var (
 	glog = backend.NewLoggerWith("logger", "tsdb.influx_flux")
 )
 
-// Query builds flux queries, executes them, and returns the results.
-func Query(ctx context.Context, dsInfo *models.DatasourceInfo, tsdbQuery backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	logger := glog.FromContext(ctx)
-	tRes := backend.NewQueryDataResponse()
+// Executor runs Flux queries for one request and is safe for concurrent use.
+type Executor struct {
+	runner queryRunner
+	client influxdb2.Client
+	dsInfo *models.DatasourceInfo
+}
+
+// NewExecutor validates the configuration and builds the influxdb2 client for one request.
+func NewExecutor(dsInfo *models.DatasourceInfo) (*Executor, error) {
 	r, err := runnerFromDataSource(dsInfo)
 	if err != nil {
-		return &backend.QueryDataResponse{}, err
+		return nil, err
 	}
-	defer r.client.Close()
+	return &Executor{runner: r, client: r.client, dsInfo: dsInfo}, nil
+}
 
-	for _, query := range tsdbQuery.Queries {
-		qm, err := getQueryModel(query, query.TimeRange, dsInfo)
-		if err != nil {
-			tRes.Responses[query.RefID] = backend.DataResponse{
-				Error:       err,
-				ErrorSource: backend.ErrorSourceDownstream,
-			}
-			continue
-		}
+// Execute runs one query and reports any failure in the returned response.
+func (e *Executor) Execute(ctx context.Context, query backend.DataQuery) backend.DataResponse {
+	logger := glog.FromContext(ctx)
 
-		// If the default changes also update labels/placeholder in config page.
-		maxSeries := dsInfo.MaxSeries
-		res := executeQuery(ctx, logger, *qm, r, maxSeries)
-
-		tRes.Responses[query.RefID] = res
+	qm, err := getQueryModel(query, query.TimeRange, e.dsInfo)
+	if err != nil {
+		return backend.DataResponse{Error: err, ErrorSource: backend.ErrorSourceDownstream}
 	}
-	return tRes, nil
+
+	// If the default changes also update labels/placeholder in config page.
+	return executeQuery(ctx, logger, *qm, e.runner, e.dsInfo.MaxSeries)
+}
+
+// Close releases the influxdb2 client and is a no-op when the client is nil.
+func (e *Executor) Close() error {
+	if e.client != nil {
+		e.client.Close()
+	}
+	return nil
 }
 
 // runner is an influxdb2 Client with an attached org property and is used
