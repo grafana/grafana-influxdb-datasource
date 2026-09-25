@@ -1,6 +1,6 @@
 {
   "name": "influxdb",
-  "version": "13.1.1",
+  "version": "13.1.6",
   "scripts": {
     "build": "webpack -c ./webpack.config.ts --env production",
     "dev": "webpack -w -c ./webpack.config.ts --env development",
@@ -16,7 +16,7 @@
   "author": "Grafana",
   "license": "AGPL-3.0",
   "devDependencies": {
-    "@grafana/e2e-selectors": "13.1.1",
+    "@grafana/e2e-selectors": "13.2.0-30866084945",
     "@grafana/eslint-config": "9.0.0",
     "@grafana/plugin-e2e": "3.9.2",
     "@grafana/sign-plugin": "3.3.2",
@@ -70,7 +70,7 @@
   },
   "engines": {
     "node": ">=24",
-    "npm": ">=11.12.1"
+    "npm": ">=11.16.0"
   },
   "dependencies": {
     "@emotion/css": "11.13.5",

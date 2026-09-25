@@ -1,5 +1,27 @@
 # Changelog
 
+## 13.1.6
+
+- Correct interpolation and escaping across InfluxQL, Flux and SQL ([#59](https://github.com/grafana/grafana-influxdb-datasource/pull/59))
+- Fix security vulnerabilities (CVE-2026-84445)
+
+## 13.1.5
+
+- Report query errors instead of empty results, quote dotted table names once and make system tables queryable ([#60](https://github.com/grafana/grafana-influxdb-datasource/pull/60))
+
+## 13.1.4
+
+- Forward OAuth Identity for InfluxQL queries ([#92](https://github.com/grafana/grafana-influxdb-datasource/pull/92))
+- Remove dead frontend code ([#61](https://github.com/grafana/grafana-influxdb-datasource/pull/61))
+
+## 13.1.3
+
+- Update dependencies
+
+## 13.1.2
+
+- Bump go v1.26.7 and grafana-plugin-sdk-go v0.296.4 ([#72](https://github.com/grafana/grafana-influxdb-datasource/pull/72))
+
 ## 13.1.1
 
 - Correct error source for InfluxQL query errors ([#77](https://github.com/grafana/grafana-influxdb-datasource/pull/77))

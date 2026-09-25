@@ -13,14 +13,12 @@ export const AnnotationEditor = (props: QueryEditorProps<InfluxDatasource, Influ
   const [textColumn, setTextColumn] = useState<string>(query.textColumn ?? '');
   const [tagsColumn, setTagsColumn] = useState<string>(query.tagsColumn ?? '');
   const [timeEndColumn, setTimeEndColumn] = useState<string>(query?.timeEndColumn ?? '');
-  const [titleColumn] = useState<string>(query?.titleColumn ?? '');
   const updateValue = <K extends keyof InfluxQuery, V extends InfluxQuery[K]>(key: K, val: V) => {
     onChange({
       ...query,
       [key]: val,
       rawQuery: true,
       fromAnnotations: true,
-      textEditor: true,
     });
   };
   return (
@@ -73,10 +71,6 @@ export const AnnotationEditor = (props: QueryEditorProps<InfluxDatasource, Influ
               onBlur={() => updateValue('timeEndColumn', timeEndColumn)}
             />
           </Stack>
-          <div className="gf-form ng-hide">
-            <InlineFormLabel width={12}>Title</InlineFormLabel>
-            <Input defaultValue={titleColumn} />
-          </div>
         </Stack>
       </Stack>
       {/*Empty div to preserve the bottom margin */}
