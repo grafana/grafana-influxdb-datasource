@@ -38,8 +38,7 @@ func httpResponse(body string, statusCode int, header http.Header) *http.Respons
 	}
 }
 
-// parserStrategies is every parser the executor can be constructed with.
-// parseResponse must behave identically at the seam regardless of strategy.
+// parserStrategies lists every parser that NewExecutor can select.
 var parserStrategies = map[string]responseParser{
 	"buffered":  buffered.ResponseParse,
 	"streaming": querydata.ResponseParse,
