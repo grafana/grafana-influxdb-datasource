@@ -112,7 +112,7 @@ export const PartListSection = ({
             }}
           />
           <AccessoryButton
-            style={{ marginRight: '4px' }}
+            style={{ marginLeft: '4px', marginRight: '4px' }}
             aria-label={`Remove ${part.name}`}
             icon="times"
             variant="secondary"

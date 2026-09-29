@@ -53,6 +53,23 @@ describe('PartListSection', () => {
     expect(onRemovePart).toHaveBeenCalledWith(1);
   });
 
+  it('keeps function names next to parentheses and spaces remove buttons from parts', () => {
+    render(
+      <PartListSection
+        parts={parts}
+        getNewPartOptions={getNewPartOptions}
+        onChange={jest.fn()}
+        onRemovePart={jest.fn()}
+        onAddNewPart={jest.fn()}
+      />
+    );
+
+    const partName = screen.getByText('mean', { selector: 'span' });
+    expect(getComputedStyle(partName).marginRight).toBe('0px');
+    expect(partName.nextSibling?.textContent).toBe('(');
+    expect(screen.getByRole('button', { name: 'Remove mean' })).toHaveStyle({ marginLeft: '4px' });
+  });
+
   it('updates an editable parameter', async () => {
     const user = userEvent.setup();
     const onChange = jest.fn();
