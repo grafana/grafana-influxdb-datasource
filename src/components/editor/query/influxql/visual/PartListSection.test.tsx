@@ -67,6 +67,8 @@ describe('PartListSection', () => {
     const partName = screen.getByText('mean', { selector: 'span' });
     expect(getComputedStyle(partName).marginRight).toBe('0px');
     expect(partName.nextSibling?.textContent).toBe('(');
+    expect(getComputedStyle(partName.parentElement!).paddingRight).toBe('8px');
+    expect(getComputedStyle(partName.parentElement!).marginRight).toBe('4px');
     expect(screen.getByRole('button', { name: 'Remove mean' })).toHaveStyle({ marginLeft: '4px' });
   });
 

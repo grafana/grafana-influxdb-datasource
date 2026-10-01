@@ -36,9 +36,8 @@ type PartProps = {
 const getStyles = (theme: GrafanaTheme2) => ({
   part: css({
     paddingLeft: 0,
-    paddingRight: 0,
     marginLeft: 0,
-    marginRight: 0,
+    marginRight: theme.spacing(0.5),
     lineHeight: theme.typography.body.lineHeight,
     fontSize: theme.typography.body.fontSize,
   }),
