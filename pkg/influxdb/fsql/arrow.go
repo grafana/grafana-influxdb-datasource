@@ -44,7 +44,7 @@ func newQueryDataResponse(reader recordReader, query sqlutil.Query, headers meta
 		resp.Error = err
 		resp.Frames = data.Frames{}
 		if grpcStatusErr, ok := status.FromError(err); ok {
-			resp.Status = backendStatus(grpcStatusErr.Code())
+			resp.Status, _ = backendStatus(grpcStatusErr.Code())
 			resp.ErrorSource = backend.ErrorSourceDownstream
 		}
 		return resp
