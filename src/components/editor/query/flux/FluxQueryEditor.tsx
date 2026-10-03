@@ -16,6 +16,98 @@ import {
 import type InfluxDatasource from '../../../../datasource';
 import { type InfluxQuery } from '../../../../types';
 
+const INFLUX_FLUX_LANGUAGE_ID = 'influx-flux';
+
+function registerFluxLanguage(monaco: any) {
+  if (monaco.languages.getLanguages().some((l: any) => l.id === INFLUX_FLUX_LANGUAGE_ID)) {
+    return;
+  }
+
+  monaco.languages.register({ id: INFLUX_FLUX_LANGUAGE_ID });
+
+  monaco.languages.setLanguageConfiguration(INFLUX_FLUX_LANGUAGE_ID, {
+    comments: {
+      lineComment: '//',
+      blockComment: ['/*', '*/'],
+    },
+    brackets: [
+      ['{', '}'],
+      ['[', ']'],
+      ['(', ')'],
+    ],
+    autoClosingPairs: [
+      { open: '{', close: '}' },
+      { open: '[', close: ']' },
+      { open: '(', close: ')' },
+      { open: '"', close: '"' },
+      { open: "'", close: "'" },
+    ],
+    surroundingPairs: [
+      { open: '{', close: '}' },
+      { open: '[', close: ']' },
+      { open: '(', close: ')' },
+      { open: '"', close: '"' },
+      { open: "'", close: "'" },
+    ],
+  });
+
+  monaco.languages.setMonarchTokensProvider(INFLUX_FLUX_LANGUAGE_ID, {
+    keywords: [
+      'from', 'range', 'filter', 'map', 'reduce', 'yield', 'group', 'sort',
+      'limit', 'mean', 'median', 'min', 'max', 'sum', 'count', 'distinct',
+      'aggregateWindow', 'aggregate', 'count', 'derivative', 'difference',
+      'cumulativeSum', 'movingAverage', 'experimental', 'union', 'join',
+      'pivot', 'shift', 'keep', 'drop', 'rename', 'duplicate', 'type',
+      'bool', 'int', 'uint', 'float', 'string', 'time', 'duration',
+      'true', 'false', 'and', 'or', 'not', 'import', 'package', 'as',
+      'option', 'test', 'return', 'existent', 'experimental', 'v',
+    ],
+    operators: ['=', '>', '<', '>=', '<=', '!=', '+', '-', '*', '/', '%', '|>'],
+    symbols: /[=!<>:%&|^*+\-\/]+/,
+    tokenizer: {
+      root: [
+        [/\/\/.*$/, 'comment'],
+        [/\/\*/, 'comment', '@comment'],
+        [/"([^"\\]|\\.)*$/, 'string.invalid'],
+        [/'([^'\\]|\\.)*$/, 'string.invalid'],
+        [/"/, 'string', '@doubleString'],
+        [/'/, 'string', '@singleString'],
+        [/[a-zA-Z_]\w*/, {
+          cases: {
+            '@keywords': 'keyword',
+            '@default': 'identifier',
+          },
+        }],
+        [/[{}()[\]]/, '@brackets'],
+        [/[<>](?!@symbols)/, '@brackets'],
+        [/@symbols/, {
+          cases: {
+            '@operators': 'operator',
+            '@default': '',
+          },
+        }],
+        [/\d+(\.\d+)?([eE][+-]?\d+)?/, 'number'],
+        [/#[a-zA-Z_]\w*/, 'tag'],
+      ],
+      comment: [
+        [/[^/*]+/, 'comment'],
+        [/\*\//, 'comment', '@pop'],
+        [/[/*]/, 'comment'],
+      ],
+      doubleString: [
+        [/[^\\"]+/, 'string'],
+        [/"/, 'string', '@pop'],
+        [/\\./, 'string.escape'],
+      ],
+      singleString: [
+        [/[^\\']+/, 'string'],
+        [/'/, 'string', '@pop'],
+        [/\\./, 'string.escape'],
+      ],
+    },
+  } as any);
+}
+
 interface Props {
   onChange: (query: InfluxQuery) => void;
   query: InfluxQuery;
@@ -161,13 +253,14 @@ export const FluxQueryEditor = memo(function FluxQueryEditor({ query, onChange }
       <CodeEditor
         height={'100%'}
         containerStyles={styles.editorContainerStyles}
-        language="sql"
+        language={INFLUX_FLUX_LANGUAGE_ID}
         value={query.query || ''}
         onBlur={onFluxQueryChange}
         onSave={onFluxQueryChange}
         showMiniMap={false}
         showLineNumbers={true}
         getSuggestions={getSuggestions}
+        onBeforeEditorMount={registerFluxLanguage}
       />
       <div className={cx('gf-form-inline', styles.editorActions)}>
         <LinkButton
