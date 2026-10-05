@@ -1,0 +1,24 @@
+name: Scheduled Cloud end-to-end tests
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright-cloud:
+    permissions:
+      contents: read
+      id-token: write
+    uses: grafana/data-sources-ci-workflows/.github/workflows/playwright-cloud.yml@main
+    secrets: inherit
+    with:
+      repo-secrets: |
+        DS_INSTANCE_NAME=influxV3:name
+        DS_INSTANCE_URL=influxV3:url
+        DS_INSTANCE_VERSION=influxV3:json_version
+        DS_INSTANCE_DB_NAME=influxV3:json_dbName
+        DS_INSTANCE_INSECURE_GRPC=influxV3:json_insecureGrpc
