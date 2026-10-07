@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.1.7
+
+- Fix security vulnerabilities (CVE-2026-102278, CVE-2026-102276, CVE-2026-102990)
+
 ## 13.1.6
 
 - Correct interpolation and escaping across InfluxQL, Flux and SQL ([#59](https://github.com/grafana/grafana-influxdb-datasource/pull/59))
