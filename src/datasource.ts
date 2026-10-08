@@ -423,7 +423,10 @@ export default class InfluxDatasource extends DataSourceWithBackend<InfluxQuery,
         }
         if (field) {
           field.values.forEach((v) => {
-            valueMap.set(v.toString(), { text: v.toString() });
+            if (v != null) {
+              const text = String(v);
+              valueMap.set(text, { text });
+            }
           });
         }
       }

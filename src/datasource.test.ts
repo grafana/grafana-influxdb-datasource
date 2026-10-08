@@ -1,6 +1,6 @@
 import { lastValueFrom, of } from 'rxjs';
 
-import { type AdHocVariableFilter } from '@grafana/data';
+import { FieldType, toDataFrame, type AdHocVariableFilter } from '@grafana/data';
 import { type TemplateSrv } from '@grafana/runtime';
 
 import { BROWSER_MODE_DISABLED_MESSAGE } from './constants';
@@ -103,6 +103,26 @@ describe('InfluxDataSource', () => {
       expect(values.length).toBe(5);
       expect(values[0].text).toBe('test-t2-1');
     });
+  });
+});
+
+describe('toMetricFindValue', () => {
+  it.each([
+    [FieldType.string, [null, undefined, 'cpu', '', 'cpu'], [{ text: 'cpu' }, { text: '' }]],
+    [FieldType.number, [null, 0, undefined, 2], [{ text: '0' }, { text: '2' }]],
+    [FieldType.boolean, [undefined, false, null, true], [{ text: 'false' }, { text: 'true' }]],
+  ])('skips nullish %s cells without dropping other values', (type, values, expected) => {
+    const ds = getMockInfluxDS();
+    const frame = toDataFrame({ fields: [{ name: 'value', type, values }] });
+    expect(ds.toMetricFindValue({ data: [frame] })).toEqual(expected);
+  });
+
+  it('handles a selected field containing only nullish cells', () => {
+    const ds = getMockInfluxDS();
+    const frame = toDataFrame({
+      fields: [{ name: 'value', type: FieldType.string, values: [null, undefined] }],
+    });
+    expect(ds.toMetricFindValue({ data: [frame] })).toEqual([]);
   });
 });
 
