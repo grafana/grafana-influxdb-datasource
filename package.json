@@ -1,6 +1,6 @@
 {
   "name": "influxdb",
-  "version": "13.1.6",
+  "version": "13.1.7",
   "scripts": {
     "build": "webpack -c ./webpack.config.ts --env production",
     "dev": "webpack -w -c ./webpack.config.ts --env development",
@@ -71,6 +71,9 @@
   "engines": {
     "node": ">=24",
     "npm": ">=11.16.0"
+  },
+  "overrides": {
+    "basic-ftp": "6.2.2"
   },
   "dependencies": {
     "@emotion/css": "11.13.5",
