@@ -43,7 +43,7 @@ services:
   # InfluxDB 1.x (InfluxQL). Auth disabled by default in the OSS 1.x image.
   # ---------------------------------------------------------------------------
   influxdb1:
-    image: influxdb:1.11
+    image: influxdb:1.13@sha256:1126a8335b2dd106c5360b9f493c365d9b548100ad68791b4b421dc9f408f8d3
     ports:
       - 8086:8086/tcp
     healthcheck:
@@ -53,7 +53,7 @@ services:
       retries: 20
 
   influxdb1-loader:
-    image: curlimages/curl:latest
+    image: curlimages/curl:latest@sha256:a134550be58ab783810e613ae96fd253c38f7bdd16d9bf9be350700c7a29ac06
     depends_on:
       influxdb1:
         condition: service_healthy
@@ -76,7 +76,7 @@ services:
   # InfluxDB 2.x (Flux, plus InfluxQL via a DBRP mapping created by the loader).
   # ---------------------------------------------------------------------------
   influxdb2:
-    image: influxdb:2.7
+    image: influxdb:2.9@sha256:cdd3dbdea45c2f43513abd06ee9644b6e05d2354a2b93ca829c9f07d716eaaac
     ports:
       - 8087:8086/tcp
     environment:
@@ -95,7 +95,7 @@ services:
 
   influxdb2-loader:
     # Server image so the `influx` CLI matches the server version exactly.
-    image: influxdb:2.7
+    image: influxdb:2.9@sha256:cdd3dbdea45c2f43513abd06ee9644b6e05d2354a2b93ca829c9f07d716eaaac
     depends_on:
       influxdb2:
         condition: service_healthy
@@ -139,7 +139,7 @@ services:
       retries: 20
 
   influxdb3-loader:
-    image: curlimages/curl:latest
+    image: curlimages/curl:latest@sha256:a134550be58ab783810e613ae96fd253c38f7bdd16d9bf9be350700c7a29ac06
     depends_on:
       influxdb3:
         condition: service_healthy
