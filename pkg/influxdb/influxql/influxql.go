@@ -3,24 +3,21 @@ package influxql
 import (
 	"context"
 	"errors"
-	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
-	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/grafana/dskit/concurrency"
-	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	"github.com/grafana/grafana-plugin-sdk-go/config"
-
 	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/influxql/buffered"
 	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/influxql/querydata"
 	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/models"
+	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
+	"github.com/grafana/grafana-plugin-sdk-go/config"
 )
 
 const (
@@ -34,99 +31,84 @@ var (
 	glog               = backend.NewLoggerWith("logger", "tsdb.influx_influxql")
 )
 
-func Query(ctx context.Context, tracer trace.Tracer, dsInfo *models.DatasourceInfo, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
+// responseParser is the signature shared by the buffered and streaming parsers.
+type responseParser func(io.ReadCloser, int, *models.Query) *backend.DataResponse
+
+// Executor runs InfluxQL queries for one request and is safe for concurrent use.
+type Executor struct {
+	dsInfo *models.DatasourceInfo
+	tracer trace.Tracer
+	parse  responseParser
+}
+
+// NewExecutor selects the parsing strategy from the feature toggles of the request.
+func NewExecutor(ctx context.Context, tracer trace.Tracer, dsInfo *models.DatasourceInfo) (*Executor, error) {
+	var parse responseParser = buffered.ResponseParse
+	if config.GrafanaConfigFromContext(ctx).FeatureToggles().IsEnabled("influxqlStreamingParser") {
+		glog.FromContext(ctx).Info("InfluxDB InfluxQL streaming parser enabled: ", "info")
+		parse = querydata.ResponseParse
+	}
+	return &Executor{
+		dsInfo: dsInfo,
+		tracer: tracer,
+		parse:  parse,
+	}, nil
+}
+
+// Execute runs one query and reports any failure in the returned response.
+func (e *Executor) Execute(ctx context.Context, reqQuery backend.DataQuery) backend.DataResponse {
 	logger := glog.FromContext(ctx)
-	response := backend.NewQueryDataResponse()
-	var err error
 
-	config := config.GrafanaConfigFromContext(ctx)
-
-	// We are testing running of queries in parallel behind feature flag
-	if config.FeatureToggles().IsEnabled("influxdbRunQueriesInParallel") {
-		concurrentQueryCount, err := req.PluginContext.GrafanaConfig.ConcurrentQueryCount()
-		if err != nil {
-			logger.Debug(fmt.Sprintf("Concurrent Query Count read/parse error: %v", err), "influxdbRunQueriesInParallel")
-			concurrentQueryCount = 10
-		}
-
-		responseLock := sync.Mutex{}
-		err = concurrency.ForEachJob(ctx, len(req.Queries), concurrentQueryCount, func(ctx context.Context, idx int) error {
-			reqQuery := req.Queries[idx]
-			query, err := models.QueryParse(reqQuery, logger)
-			if err != nil {
-				responseLock.Lock()
-				response.Responses[query.RefID] = backend.DataResponse{
-					Error:       err,
-					ErrorSource: backend.ErrorSourceDownstream,
-				}
-				responseLock.Unlock()
-				return nil
-			}
-
-			// query.Build() unconditionally returns nil for error.
-			rawQuery, _ := query.Build(req)
-
-			query.RefID = reqQuery.RefID
-			query.RawQuery = rawQuery
-
-			logger.Debug("Influxdb query", "raw query", rawQuery)
-
-			request, err := createRequest(ctx, logger, dsInfo, rawQuery, query.Policy)
-			if err != nil {
-				responseLock.Lock()
-				response.Responses[query.RefID] = backend.DataResponse{
-					Error:       err,
-					ErrorSource: backend.ErrorSourceDownstream,
-				}
-				responseLock.Unlock()
-				return nil
-			}
-
-			resp, _ := execute(ctx, tracer, dsInfo, logger, query, request, config.FeatureToggles().IsEnabled("influxqlStreamingParser"))
-
-			responseLock.Lock()
-			defer responseLock.Unlock()
-			response.Responses[query.RefID] = resp
-			return nil // errors are saved per-query,always return nil
-		})
-
-		if err != nil {
-			logger.Debug("Influxdb concurrent query error", "concurrent query", err)
-		}
-	} else {
-		for _, reqQuery := range req.Queries {
-			query, err := models.QueryParse(reqQuery, logger)
-			if err != nil {
-				response.Responses[query.RefID] = backend.DataResponse{
-					Error:       err,
-					ErrorSource: backend.ErrorSourceDownstream,
-				}
-				continue
-			}
-
-			// query.Build() unconditionally returns nil for error.
-			rawQuery, _ := query.Build(req)
-
-			query.RefID = reqQuery.RefID
-			query.RawQuery = rawQuery
-
-			logger.Debug("Influxdb query", "raw query", rawQuery)
-
-			request, err := createRequest(ctx, logger, dsInfo, rawQuery, query.Policy)
-			if err != nil {
-				response.Responses[query.RefID] = backend.DataResponse{
-					Error:       err,
-					ErrorSource: backend.ErrorSourceDownstream,
-				}
-				continue
-			}
-
-			resp, _ := execute(ctx, tracer, dsInfo, logger, query, request, config.FeatureToggles().IsEnabled("influxqlStreamingParser"))
-			response.Responses[query.RefID] = resp
-		}
+	query, err := models.QueryParse(reqQuery, logger)
+	if err != nil {
+		return backend.DataResponse{Error: err, ErrorSource: backend.ErrorSourceDownstream}
 	}
 
-	return response, err
+	// Build never returns an error and reads the time range from Queries[0].
+	rawQuery, _ := query.Build(&backend.QueryDataRequest{Queries: []backend.DataQuery{reqQuery}})
+
+	query.RefID = reqQuery.RefID
+	query.RawQuery = rawQuery
+
+	logger.Debug("Influxdb query", "raw query", rawQuery)
+
+	request, err := createRequest(ctx, logger, e.dsInfo, rawQuery, query.Policy)
+	if err != nil {
+		return backend.DataResponse{Error: err, ErrorSource: backend.ErrorSourceDownstream}
+	}
+
+	res, err := e.dsInfo.HTTPClient.Do(request)
+	if err != nil {
+		return backend.DataResponse{Error: err, ErrorSource: backend.ErrorSourceDownstream}
+	}
+
+	return e.parseResponse(ctx, res, query)
+}
+
+// parseResponse parses and closes the response body.
+func (e *Executor) parseResponse(ctx context.Context, res *http.Response, query *models.Query) backend.DataResponse {
+	logger := glog.FromContext(ctx)
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			logger.Warn("Failed to close response body", "err", err)
+		}
+	}()
+
+	_, endSpan := startTrace(ctx, e.tracer, "datasource.influxdb.influxql.parseResponse")
+	defer endSpan()
+
+	resp := e.parse(res.Body, res.StatusCode, query)
+
+	if len(resp.Frames) > 0 {
+		resp.Frames[0].Meta.Custom = readCustomMetadata(res)
+	}
+
+	return *resp
+}
+
+// Close is a no-op because InfluxQL holds no per-request resources.
+func (e *Executor) Close() error {
+	return nil
 }
 
 func createRequest(ctx context.Context, logger log.Logger, dsInfo *models.DatasourceInfo, queryStr string, retentionPolicy string) (*http.Request, error) {
@@ -184,38 +166,6 @@ func createRequest(ctx context.Context, logger log.Logger, dsInfo *models.Dataso
 
 	logger.Debug("Influxdb request", "url", req.URL.String())
 	return req, nil
-}
-
-func execute(ctx context.Context, tracer trace.Tracer, dsInfo *models.DatasourceInfo, logger log.Logger, query *models.Query, request *http.Request, isStreamingParserEnabled bool) (backend.DataResponse, error) {
-	res, err := dsInfo.HTTPClient.Do(request)
-	if err != nil {
-		return backend.DataResponse{
-			Error:       err,
-			ErrorSource: backend.ErrorSourceDownstream,
-		}, err
-	}
-	defer func() {
-		if err := res.Body.Close(); err != nil {
-			logger.Warn("Failed to close response body", "err", err)
-		}
-	}()
-
-	_, endSpan := startTrace(ctx, tracer, "datasource.influxdb.influxql.parseResponse")
-	defer endSpan()
-
-	var resp *backend.DataResponse
-	if isStreamingParserEnabled {
-		logger.Info("InfluxDB InfluxQL streaming parser enabled: ", "info")
-		resp = querydata.ResponseParse(res.Body, res.StatusCode, query)
-	} else {
-		resp = buffered.ResponseParse(res.Body, res.StatusCode, query)
-	}
-
-	if len(resp.Frames) > 0 {
-		resp.Frames[0].Meta.Custom = readCustomMetadata(res)
-	}
-
-	return *resp, nil
 }
 
 func readCustomMetadata(res *http.Response) map[string]any {
