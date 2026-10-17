@@ -165,6 +165,10 @@ func readSeries(iter *sdkjsoniter.Iterator, query *models.Query) *backend.DataRe
 			}
 		}
 
+		if hasTimeColumn && len(valueFields) < len(columns) {
+			valueFields = padEmptySeriesFields(valueFields, columns)
+		}
+
 		if util.GetVisType(query.ResultFormat) == util.TableVisType {
 			handleTableFormatFirstFrame(rsp, measurement, query)
 			handleTableFormatFirstField(rsp, valueFields, columns)
@@ -366,6 +370,22 @@ func typeOf(value interface{}) data.FieldType {
 		slog.Error("unknown influx value type", "value", v)
 		return data.FieldTypeNullableJSON //nolint:staticcheck
 	}
+}
+
+// padEmptySeriesFields fills columns that never received a point.
+// An empty "values" array still creates the time field, and a missing
+// "values" key creates nothing. The time-series builder indexes one
+// field per column.
+func padEmptySeriesFields(valueFields data.Fields, columns []string) data.Fields {
+	if len(valueFields) == 0 {
+		valueFields = append(valueFields, data.NewField("Time", nil, []time.Time{}))
+	}
+	for len(valueFields) < len(columns) {
+		field := data.NewFieldFromFieldType(data.FieldTypeNullableFloat64, 0)
+		field.Name = "Value"
+		valueFields = append(valueFields, field)
+	}
+	return valueFields
 }
 
 func handleTimeSeriesFormatWithTimeColumn(valueFields data.Fields, tags map[string]string, columns []string, measurement string, frameName []byte, query *models.Query) []*data.Frame {
