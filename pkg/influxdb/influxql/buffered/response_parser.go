@@ -47,6 +47,16 @@ func parse(buf io.Reader, statusCode int, query *models.Query) *backend.DataResp
 		}
 	}
 
+	if len(response.Results) == 0 {
+		if response.Message != "" {
+			return &backend.DataResponse{
+				Error:       errors.New(response.Message),
+				ErrorSource: backend.ErrorSourceDownstream,
+			}
+		}
+		return &backend.DataResponse{Frames: make(data.Frames, 0)}
+	}
+
 	result := response.Results[0]
 	if result.Error != "" {
 		return &backend.DataResponse{
