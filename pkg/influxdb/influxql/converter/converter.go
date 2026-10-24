@@ -122,6 +122,12 @@ func readSeries(iter *sdkjsoniter.Iterator, query *models.Query) *backend.DataRe
 		if err != nil {
 			return rspErr(err)
 		}
+		// A series with no values key must not keep the previous series' fields.
+		// InfluxDB 1.x omits an empty values array.
+		valueFields = nil
+		columns = nil
+		tags = nil
+		hasTimeColumn = false
 
 		for l1Field, err := iter.ReadObject(); l1Field != ""; l1Field, err = iter.ReadObject() {
 			if err != nil {
@@ -163,6 +169,10 @@ func readSeries(iter *sdkjsoniter.Iterator, query *models.Query) *backend.DataRe
 				}
 				fmt.Printf("[Series] unsupported key: %s / %v\n", l1Field, v)
 			}
+		}
+
+		if hasTimeColumn && len(valueFields) < len(columns) {
+			valueFields = padEmptySeriesFields(valueFields, columns)
 		}
 
 		if util.GetVisType(query.ResultFormat) == util.TableVisType {
@@ -366,6 +376,22 @@ func typeOf(value interface{}) data.FieldType {
 		slog.Error("unknown influx value type", "value", v)
 		return data.FieldTypeNullableJSON //nolint:staticcheck
 	}
+}
+
+// padEmptySeriesFields fills columns that never received a point.
+// An empty "values" array still creates the time field, and a missing
+// "values" key creates nothing. The time-series builder indexes one
+// field per column.
+func padEmptySeriesFields(valueFields data.Fields, columns []string) data.Fields {
+	if len(valueFields) == 0 {
+		valueFields = append(valueFields, data.NewField("Time", nil, []time.Time{}))
+	}
+	for len(valueFields) < len(columns) {
+		field := data.NewFieldFromFieldType(data.FieldTypeNullableFloat64, 0)
+		field.Name = "Value"
+		valueFields = append(valueFields, field)
+	}
+	return valueFields
 }
 
 func handleTimeSeriesFormatWithTimeColumn(valueFields data.Fields, tags map[string]string, columns []string, measurement string, frameName []byte, query *models.Query) []*data.Frame {
