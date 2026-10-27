@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.1.9
+
+- Bump backend dependency
+
 ## 13.1.8
 
 - Chore: Pin golangci-lint to 2.15.0 in development dependencies and CI/CD pipelines
