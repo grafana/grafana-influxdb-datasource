@@ -23,6 +23,10 @@ module.exports = {
       '@lezer/common',
       '@lezer/highlight',
       '@grafana/lezer-logql',
+      // ESM-only packages pulled in by @grafana/* 13.3
+      '@react-hookz/web',
+      '@ver0/deep-equal',
+      '@marcbachmann/cel-js',
     ]),
   ],
 };

@@ -6,6 +6,10 @@ services:
     environment:
       # Grafana 13 enables splashScreen by default; the overlay blocks Playwright interactions.
       GF_FEATURE_TOGGLES_splashScreen: 'false'
+      # Grafana 13.3 moves annotation settings into the dashboard sidebar when
+      # dashboardNewLayouts is on, which removes the settings page that
+      # @grafana/plugin-e2e's annotationEditPage fixture drives.
+      GF_FEATURE_TOGGLES_dashboardNewLayouts: 'false'
       # On slow CI runners, concurrent startup writes to sqlite can fail
       # datasource provisioning with SQLITE_BUSY, which Grafana 13 treats as a
       # fatal module failure. WAL reduces lock contention, but write-write
