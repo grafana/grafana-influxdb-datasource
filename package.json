@@ -1,6 +1,6 @@
 {
   "name": "influxdb",
-  "version": "13.1.9",
+  "version": "13.1.10",
   "scripts": {
     "build": "webpack -c ./webpack.config.ts --env production",
     "dev": "webpack -w -c ./webpack.config.ts --env development",
