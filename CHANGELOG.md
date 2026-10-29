@@ -1,5 +1,9 @@
 # Changelog
 
+## 13.1.10
+
+- Fix security vulnerabilities (GHSA-cg2g-xh64-v4q7, GHSA-mrv2-3pqr-j5jr, CVE-2026-93749, CVE-2023-54404, CVE-2026-78669, CVE-2026-78660, CVE-2026-78659)
+
 ## 13.1.9
 
 - Bump backend dependency
