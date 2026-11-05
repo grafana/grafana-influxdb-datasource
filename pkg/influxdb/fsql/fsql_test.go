@@ -220,3 +220,28 @@ func TestParseURL(t *testing.T) {
 		})
 	}
 }
+
+func TestErrStrIsDownstream(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "query failed is classified downstream",
+			input:    "code = Internal desc = query failed: Invalid Error: Failed to query most recent snapshot",
+			expected: true,
+		},
+		{
+			name:     "no query failed is not classified downstream",
+			input:    "unknown error no failed query here",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expected, errStrIsDownstream(tt.input))
+		})
+	}
+}

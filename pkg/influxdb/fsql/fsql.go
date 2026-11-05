@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"google.golang.org/grpc/codes"
@@ -56,6 +57,8 @@ func Query(ctx context.Context, dsInfo *models.DatasourceInfo, req backend.Query
 			errStr := fmt.Sprintf("flightsql: %s", err)
 			if grpcStatusErr, ok := status.FromError(err); ok {
 				tRes.Responses[q.RefID] = backend.ErrDataResponseWithSource(backendStatus(grpcStatusErr.Code()), backend.ErrorSourceDownstream, errStr)
+			} else if errStrIsDownstream(errStr) {
+				tRes.Responses[q.RefID] = backend.ErrDataResponseWithSource(backend.StatusInternal, backend.ErrorSourceDownstream, errStr)
 			} else {
 				tRes.Responses[q.RefID] = backend.ErrDataResponse(backend.StatusInternal, errStr)
 			}
@@ -82,6 +85,10 @@ func Query(ctx context.Context, dsInfo *models.DatasourceInfo, req backend.Query
 	}
 
 	return tRes, nil
+}
+
+func errStrIsDownstream(errStr string) bool {
+	return strings.Contains(errStr, "code = Internal desc = query failed:")
 }
 
 // backendStatus maps a gRPC status code to a backend plugin status.
