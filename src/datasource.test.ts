@@ -104,6 +104,26 @@ describe('InfluxDataSource', () => {
       expect(values[0].text).toBe('test-t2-1');
     });
   });
+
+  describe('filterQuery in InfluxQL mode', () => {
+    const ds = getMockInfluxDS(getMockDSInstanceSettings());
+
+    it('should skip queries without a measurement or raw query', () => {
+      expect(ds.filterQuery({ refId: 'A' })).toBe(false);
+      expect(ds.filterQuery({ refId: 'A', query: '', measurement: '' })).toBe(false);
+      expect(ds.filterQuery({ refId: 'A', rawQuery: true, query: '' })).toBe(false);
+      expect(ds.filterQuery({ refId: 'A', rawQuery: false, query: 'SELECT * FROM cpu' })).toBe(false);
+    });
+
+    it('should run builder queries with a measurement', () => {
+      expect(ds.filterQuery({ refId: 'A', measurement: 'cpu' })).toBe(true);
+      expect(ds.filterQuery({ refId: 'A', rawQuery: true, query: '', measurement: 'cpu' })).toBe(true);
+    });
+
+    it('should run raw queries with a query', () => {
+      expect(ds.filterQuery({ refId: 'A', rawQuery: true, query: 'SELECT * FROM cpu' })).toBe(true);
+    });
+  });
 });
 
 describe('toMetricFindValue', () => {

@@ -174,7 +174,8 @@ export default class InfluxDatasource extends DataSourceWithBackend<InfluxQuery,
     if (this.version === InfluxVersion.SQL) {
       return !!query.rawSql;
     }
-    return true;
+    // The backend runs the raw query only when it is set and otherwise builds one from the measurement.
+    return (!!query.rawQuery && !!query.query) || !!query.measurement;
   }
 
   applyTemplateVariables(
