@@ -57,7 +57,7 @@ services:
       retries: 20
 
   influxdb1-loader:
-    image: curlimages/curl:latest
+    image: curlimages/curl:latest@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93
     depends_on:
       influxdb1:
         condition: service_healthy
@@ -132,7 +132,7 @@ services:
   # in-memory object store because fixtures are reloaded on every `up`.
   # ---------------------------------------------------------------------------
   influxdb3:
-    image: influxdb:3-core
+    image: influxdb:3-core@sha256:26875ba5ae6e843fdbd208b1ac4a55fa1d2ec3aa7faf2d0d1b5035cb1f998990
     command: influxdb3 serve --node-id node0 --object-store memory --without-auth
     ports:
       - 8181:8181/tcp
@@ -143,7 +143,7 @@ services:
       retries: 20
 
   influxdb3-loader:
-    image: curlimages/curl:latest
+    image: curlimages/curl:latest@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93
     depends_on:
       influxdb3:
         condition: service_healthy
