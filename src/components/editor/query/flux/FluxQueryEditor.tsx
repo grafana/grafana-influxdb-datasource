@@ -1,5 +1,5 @@
 import { css, cx } from '@emotion/css';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 
 import { type GrafanaTheme2, type SelectableValue } from '@grafana/data';
 import { getTemplateSrv } from '@grafana/runtime';
@@ -11,6 +11,7 @@ import {
   LinkButton,
   Segment,
   useStyles2,
+  type Monaco,
 } from '@grafana/ui';
 
 import type InfluxDatasource from '../../../../datasource';
@@ -149,6 +150,34 @@ export const FluxQueryEditor = memo(function FluxQueryEditor({ query, onChange }
     return sugs;
   }
 
+  // Register a minimal `flux` language so that Monaco's line-comment toggle
+  // (Ctrl/Cmd+/) inserts //, which matches the Flux language. Without a
+  // language configuration, Monaco falls back to the SQL default (--).
+  const handleEditorBeforeMount = useCallback((monacoInstance: Monaco) => {
+    const registered = monacoInstance.languages.getLanguages().some((l) => l.id === 'flux');
+    if (registered) {
+      return;
+    }
+    monacoInstance.languages.register({ id: 'flux' });
+    monacoInstance.languages.setLanguageConfiguration('flux', {
+      comments: {
+        lineComment: '//',
+      },
+      brackets: [
+        ['{', '}'],
+        ['[', ']'],
+        ['(', ')'],
+      ],
+      autoClosingPairs: [
+        { open: '{', close: '}' },
+        { open: '[', close: ']' },
+        { open: '(', close: ')' },
+        { open: "'", close: "'" },
+        { open: '"', close: '"' },
+      ],
+    });
+  }, []);
+
   const helpTooltip = (
     <div>
       Type: <i>ctrl+space</i> to show template variable suggestions <br />
@@ -161,7 +190,8 @@ export const FluxQueryEditor = memo(function FluxQueryEditor({ query, onChange }
       <CodeEditor
         height={'100%'}
         containerStyles={styles.editorContainerStyles}
-        language="sql"
+        language="flux"
+        onBeforeEditorMount={handleEditorBeforeMount}
         value={query.query || ''}
         onBlur={onFluxQueryChange}
         onSave={onFluxQueryChange}
