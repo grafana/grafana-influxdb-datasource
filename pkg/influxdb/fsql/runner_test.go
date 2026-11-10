@@ -60,6 +60,20 @@ func TestRunQueryErrorPaths(t *testing.T) {
 			wantErr:    "who are you",
 		},
 		{
+			name:       "unmapped grpc code maps to internal downstream",
+			client:     &fakeFlightClient{executeErr: status.Error(codes.Internal, "snapshot unavailable")},
+			wantStatus: backend.StatusInternal,
+			wantSource: backend.ErrorSourceDownstream,
+			wantErr:    "snapshot unavailable",
+		},
+		{
+			name:       "query failed text without grpc status maps to internal downstream",
+			client:     &fakeFlightClient{executeErr: errors.New("code = Internal desc = query failed: snapshot unavailable")},
+			wantStatus: backend.StatusInternal,
+			wantSource: backend.ErrorSourceDownstream,
+			wantErr:    "query failed",
+		},
+		{
 			name:       "non-grpc execute error maps to internal",
 			client:     &fakeFlightClient{executeErr: errors.New("wire fell out")},
 			wantStatus: backend.StatusInternal,

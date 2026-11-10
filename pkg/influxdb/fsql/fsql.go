@@ -122,18 +122,13 @@ func (e *Executor) Close() error {
 // errorResponse maps a Flight SQL error to a data response.
 func errorResponse(err error) backend.DataResponse {
 	errStr := fmt.Sprintf("flightsql: %s", err)
-	grpcStatusErr, ok := status.FromError(err)
-	if !ok {
-		if errStrIsDownstream(errStr) {
-			return backend.ErrDataResponseWithSource(backend.StatusInternal, backend.ErrorSourceDownstream, errStr)
-		}
-		return backend.ErrDataResponse(backend.StatusInternal, errStr)
+	if grpcStatusErr, ok := status.FromError(err); ok {
+		return backend.ErrDataResponseWithSource(backendStatus(grpcStatusErr.Code()), backend.ErrorSourceDownstream, errStr)
 	}
-	st, mapped := backendStatus(grpcStatusErr.Code())
-	if !mapped {
-		return backend.ErrDataResponse(backend.StatusInternal, errStr)
+	if errStrIsDownstream(errStr) {
+		return backend.ErrDataResponseWithSource(backend.StatusInternal, backend.ErrorSourceDownstream, errStr)
 	}
-	return backend.ErrDataResponseWithSource(st, backend.ErrorSourceDownstream, errStr)
+	return backend.ErrDataResponse(backend.StatusInternal, errStr)
 }
 
 func errStrIsDownstream(errStr string) bool {
@@ -141,21 +136,20 @@ func errStrIsDownstream(errStr string) bool {
 }
 
 // backendStatus maps a gRPC code to a plugin status.
-// The bool is false when the code falls back to StatusInternal.
-func backendStatus(code codes.Code) (backend.Status, bool) {
+func backendStatus(code codes.Code) backend.Status {
 	switch code {
 	case codes.InvalidArgument:
-		return backend.StatusBadRequest, true
+		return backend.StatusBadRequest
 	case codes.PermissionDenied:
-		return backend.StatusForbidden, true
+		return backend.StatusForbidden
 	case codes.NotFound:
-		return backend.StatusNotFound, true
+		return backend.StatusNotFound
 	case codes.Unavailable:
-		return backend.Status(http.StatusServiceUnavailable), true
+		return backend.Status(http.StatusServiceUnavailable)
 	case codes.Unauthenticated:
-		return backend.StatusUnauthorized, true
+		return backend.StatusUnauthorized
 	default:
-		return backend.StatusInternal, false
+		return backend.StatusInternal
 	}
 }
 
