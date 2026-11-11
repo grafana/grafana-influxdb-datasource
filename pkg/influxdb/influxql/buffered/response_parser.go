@@ -1,9 +1,11 @@
 package buffered
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 
@@ -23,12 +25,29 @@ func ResponseParse(buf io.ReadCloser, statusCode int, query *models.Query) *back
 // parse is the same as Parse, but without the io.ReadCloser (we don't need to
 // close the buffer)
 func parse(buf io.Reader, statusCode int, query *models.Query) *backend.DataResponse {
-	response, jsonErr := parseJSON(buf)
+	body, readErr := io.ReadAll(buf)
+	if readErr != nil {
+		return &backend.DataResponse{
+			Error:       fmt.Errorf("InfluxDB returned error: HTTP %d %s", statusCode, http.StatusText(statusCode)),
+			ErrorSource: backend.ErrorSourceFromHTTPStatus(statusCode),
+		}
+	}
+
+	response, jsonErr := parseJSON(bytes.NewReader(body))
 
 	if statusCode/100 != 2 {
-		errorStr := response.Error
+		errorStr := ""
+		if jsonErr == nil {
+			errorStr = response.Error
+			if errorStr == "" {
+				errorStr = response.Message
+			}
+		}
 		if errorStr == "" {
-			errorStr = response.Message
+			return &backend.DataResponse{
+				Error:       formatHTTPError(statusCode, body),
+				ErrorSource: backend.ErrorSourceFromHTTPStatus(statusCode),
+			}
 		}
 		return &backend.DataResponse{
 			Error:       fmt.Errorf("InfluxDB returned error: %s", errorStr),
@@ -37,7 +56,10 @@ func parse(buf io.Reader, statusCode int, query *models.Query) *backend.DataResp
 	}
 
 	if jsonErr != nil {
-		return &backend.DataResponse{Error: jsonErr}
+		return &backend.DataResponse{
+			Error:       formatHTTPError(statusCode, body),
+			ErrorSource: backend.ErrorSourceDownstream,
+		}
 	}
 
 	if response.Error != "" {
@@ -72,6 +94,17 @@ func parseJSON(buf io.Reader) (models.Response, error) {
 	err := dec.Decode(&response)
 
 	return response, err
+}
+
+func formatHTTPError(statusCode int, body []byte) error {
+	excerpt := strings.TrimSpace(string(body))
+	if len(excerpt) > 200 {
+		excerpt = excerpt[:200]
+	}
+	if excerpt == "" {
+		return fmt.Errorf("InfluxDB returned error: HTTP %d %s", statusCode, http.StatusText(statusCode))
+	}
+	return fmt.Errorf("InfluxDB returned error: HTTP %d %s: %s", statusCode, http.StatusText(statusCode), excerpt)
 }
 
 func transformRowsForTable(rows []models.Row, query models.Query) data.Frames {
