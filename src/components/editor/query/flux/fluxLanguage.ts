@@ -27,19 +27,21 @@ const language: monacoTypes.languages.IMonarchLanguage = {
   tokenizer: {
     root: [
       [/\/\/.*$/, 'comment.line.double-slash'],
+      // Not in vsflux. A regex must end before whitespace, a delimiter or the line end, so a/b + c/d stays division.
+      [/\/(?!\s)(?:[^\\/]|\\.)+\/(?=[\s,)\]}]|$)/, 'string.regexp'],
       [/\b(in|import|package|return|option|builtin|test|testcase|if|then|else|exists)\b/, 'keyword.control'],
       [/\B(\+|-|\*|\/|%|\^|==|<|>|!=|=~|!~|=|=>|<-)\B/, 'keyword.operator'],
       [/\b(and|or)\b/, 'keyword.operator'],
       [/\|>/, 'keyword.operator.new'],
       [/\b(true|false|empty)\b/, 'constant.language'],
       [/\b(\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d*)?((Z|(\+|-)\d{2}:\d{2}))?)?)\b/, 'constant.other'],
-      [/\b(\d*(y|mo|w|d|h|m|s|ms|us|µs|ns))+\b/, 'constant.other'],
+      // vsflux uses \d*, which also matches identifiers such as m and d.
+      [/\b(\d+(y|mo|w|d|h|m|s|ms|us|µs|ns))+\b/, 'constant.other'],
       [/\b((0(x|X)[0-9a-fA-F]*)|((\d+\.?\d*)|(\.\d+)))\b/, 'constant.numeric'],
       [/\b(from|to|buckets|join)\b/, 'support.function'],
       [/\w+(?=\()/, 'support.function'],
       [/\b(fn)(?=:)\b/, 'support.function'],
       [/"/, { token: 'string.quoted.double', next: '@string' }],
-      [/\/(?=\S.*\/)/, { token: 'string.regexp', next: '@regexp' }],
       // Not in vsflux. Monarch has no lookbehind, so this rule consumes whole words to stop \b rules matching mid-identifier.
       [/\w+/, ''],
     ],
@@ -47,10 +49,6 @@ const language: monacoTypes.languages.IMonarchLanguage = {
       [/\\./, 'constant.character.escape'],
       [/"/, { token: 'string.quoted.double', next: '@pop' }],
       [/[^\\"]+/, 'string.quoted.double'],
-    ],
-    regexp: [
-      [/[^\\/+]\//, { token: 'string.regexp', next: '@pop' }],
-      [/./, 'string.regexp'],
     ],
   },
 };
