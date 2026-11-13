@@ -16,6 +16,8 @@ import {
 import type InfluxDatasource from '../../../../datasource';
 import { type InfluxQuery } from '../../../../types';
 
+import { FLUX_LANGUAGE_ID, registerFluxLanguage } from './fluxLanguage';
+
 interface Props {
   onChange: (query: InfluxQuery) => void;
   query: InfluxQuery;
@@ -161,7 +163,8 @@ export const FluxQueryEditor = memo(function FluxQueryEditor({ query, onChange }
       <CodeEditor
         height={'100%'}
         containerStyles={styles.editorContainerStyles}
-        language="sql"
+        language={FLUX_LANGUAGE_ID}
+        onBeforeEditorMount={registerFluxLanguage}
         value={query.query || ''}
         onBlur={onFluxQueryChange}
         onSave={onFluxQueryChange}
