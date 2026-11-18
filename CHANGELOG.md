@@ -1,8 +1,13 @@
 # Changelog
 
-## Unreleased
+## 13.2.0
 
+- feat: run queries in parallel for all query languages ([#62](https://github.com/grafana/grafana-influxdb-datasource/pull/62))
 - Fix a connection freeze between Grafana and the plugin under heavy query load by updating google.golang.org/grpc to v1.85.0 ([grpc/grpc-go#9330](https://github.com/grpc/grpc-go/issues/9330))
+- InfluxQL: Skip empty queries instead of sending them to the backend ([#147](https://github.com/grafana/grafana-influxdb-datasource/pull/147))
+- Classify errors containing "query failed" as downstream ([#148](https://github.com/grafana/grafana-influxdb-datasource/pull/148))
+- fix(flux): use Flux comment markers and highlighting in the query editor ([#159](https://github.com/grafana/grafana-influxdb-datasource/pull/159))
+- Dependency updates ([#146](https://github.com/grafana/grafana-influxdb-datasource/pull/146), [#149](https://github.com/grafana/grafana-influxdb-datasource/pull/149), [#150](https://github.com/grafana/grafana-influxdb-datasource/pull/150), [#166](https://github.com/grafana/grafana-influxdb-datasource/pull/166))
 
 ## 13.1.10
 
