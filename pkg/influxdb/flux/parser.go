@@ -97,6 +97,7 @@ func readDataFrames(logger log.Logger, result tableResult, maxPoints int, maxSer
 	// result.Err() is probably more important then the other errors
 	if result.Err() != nil {
 		dr.Error = result.Err()
+		dr.ErrorSource = backend.ErrorSourceDownstream
 	}
 	return dr
 }

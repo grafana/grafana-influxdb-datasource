@@ -37,7 +37,7 @@ func parse(buf io.Reader, statusCode int, query *models.Query) *backend.DataResp
 	}
 
 	if jsonErr != nil {
-		return &backend.DataResponse{Error: jsonErr}
+		return &backend.DataResponse{Error: jsonErr, ErrorSource: backend.ErrorSourceDownstream}
 	}
 
 	if response.Error != "" {
