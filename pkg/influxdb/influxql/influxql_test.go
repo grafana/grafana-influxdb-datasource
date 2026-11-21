@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
+	"github.com/grafana/grafana-plugin-sdk-go/config"
 
 	"github.com/grafana/grafana-influxdb-datasource/pkg/influxdb/models"
 )
@@ -205,4 +207,33 @@ func TestReadCustomMetadata(t *testing.T) {
 		require.NotNil(t, result)
 		require.Equal(t, expected, result)
 	})
+}
+
+// recordingLogger records the level of every log call.
+type recordingLogger struct {
+	levels *[]string
+}
+
+func (l recordingLogger) Debug(string, ...any)                   { *l.levels = append(*l.levels, "debug") }
+func (l recordingLogger) Info(string, ...any)                    { *l.levels = append(*l.levels, "info") }
+func (l recordingLogger) Warn(string, ...any)                    { *l.levels = append(*l.levels, "warn") }
+func (l recordingLogger) Error(string, ...any)                   { *l.levels = append(*l.levels, "error") }
+func (l recordingLogger) With(...any) log.Logger                 { return l }
+func (l recordingLogger) Level() log.Level                       { return log.Debug }
+func (l recordingLogger) FromContext(context.Context) log.Logger { return l }
+
+func TestNewExecutorStreamingParserLogsNoInfo(t *testing.T) {
+	var levels []string
+	original := glog
+	glog = recordingLogger{levels: &levels}
+	t.Cleanup(func() { glog = original })
+	ctx := config.WithGrafanaConfig(context.Background(), config.NewGrafanaCfg(map[string]string{
+		"GF_INSTANCE_FEATURE_TOGGLES_ENABLE": "influxqlStreamingParser",
+	}))
+
+	e, err := NewExecutor(ctx, nil, &models.DatasourceInfo{})
+
+	require.NoError(t, err)
+	require.NotNil(t, e.parse)
+	require.NotContains(t, levels, "info")
 }

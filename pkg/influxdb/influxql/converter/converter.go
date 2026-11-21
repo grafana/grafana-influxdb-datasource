@@ -46,6 +46,7 @@ l1Fields:
 				rsp.Error = err
 			} else {
 				rsp.Error = errors.New(v)
+				rsp.ErrorSource = backend.ErrorSourceDownstream
 			}
 			return rsp
 		case "code":
@@ -82,6 +83,8 @@ l1Fields:
 
 func readResults(iter *sdkjsoniter.Iterator, query *models.Query) *backend.DataResponse {
 	rsp := &backend.DataResponse{Frames: make(data.Frames, 0)}
+	var statementErr error
+	firstResult := true
 l1Fields:
 	for more, err := iter.ReadArray(); more; more, err = iter.ReadArray() {
 		if err != nil {
@@ -94,6 +97,14 @@ l1Fields:
 			switch l1Field {
 			case "series":
 				rsp = readSeries(iter, query)
+			case "error":
+				v, err := iter.Read()
+				if err != nil {
+					return rspErr(err)
+				}
+				if msg, ok := v.(string); ok && firstResult {
+					statementErr = errors.New(msg)
+				}
 			case "":
 				break l1Fields
 			default:
@@ -103,8 +114,12 @@ l1Fields:
 				}
 			}
 		}
+		firstResult = false
 	}
 
+	if statementErr != nil {
+		return &backend.DataResponse{Error: statementErr, ErrorSource: backend.ErrorSourceDownstream}
+	}
 	return rsp
 }
 
@@ -116,6 +131,8 @@ func readSeries(iter *sdkjsoniter.Iterator, query *models.Query) *backend.DataRe
 		valueFields   data.Fields
 		hasTimeColumn bool
 	)
+
+	var tableTagKeys []string
 
 	// frameName is pre-allocated. So we can reuse it, saving memory.
 	// It's sized for a reasonably-large name, but will grow if needed.
@@ -172,7 +189,7 @@ func readSeries(iter *sdkjsoniter.Iterator, query *models.Query) *backend.DataRe
 		if util.GetVisType(query.ResultFormat) == util.TableVisType {
 			handleTableFormatFirstFrame(rsp, measurement, query)
 			handleTableFormatFirstField(rsp, valueFields, columns)
-			handleTableFormatTagFields(rsp, valueFields, tags)
+			tableTagKeys = handleTableFormatTagFields(rsp, valueFields, tags, tableTagKeys)
 			handleTableFormatValueFields(rsp, valueFields, tags, columns)
 		} else {
 			// time_series response format
@@ -443,7 +460,22 @@ func handleTableFormatFirstField(rsp *backend.DataResponse, valueFields data.Fie
 	}
 }
 
-func handleTableFormatTagFields(rsp *backend.DataResponse, valueFields data.Fields, tags map[string]string) {
+// handleTableFormatTagFields appends each tag value to its column and returns the tag column order of the first series.
+func handleTableFormatTagFields(rsp *backend.DataResponse, valueFields data.Fields, tags map[string]string, tagKeys []string) []string {
+	if tagKeys != nil && hasSameKeys(tagKeys, tags) {
+		for ti, k := range tagKeys {
+			for i := 0; i < valueFields[0].Len(); i++ {
+				val := tags[k]
+				rsp.Frames[0].Fields[ti+1].Append(&val)
+			}
+		}
+		return tagKeys
+	}
+
+	firstSeries := tagKeys == nil
+	if firstSeries {
+		tagKeys = make([]string, 0, len(tags))
+	}
 	ti := 1
 	// We have the first field, so we should add tagField if there is any tag
 	for k, v := range tags {
@@ -451,6 +483,9 @@ func handleTableFormatTagFields(rsp *backend.DataResponse, valueFields data.Fiel
 			tagField := data.NewField(k, nil, []*string{})
 			tagField.Config = &data.FieldConfig{DisplayNameFromDS: k}
 			rsp.Frames[0].Fields = append(rsp.Frames[0].Fields, tagField)
+		}
+		if firstSeries {
+			tagKeys = append(tagKeys, k)
 		}
 		var i int
 		for i < valueFields[0].Len() {
@@ -460,6 +495,19 @@ func handleTableFormatTagFields(rsp *backend.DataResponse, valueFields data.Fiel
 		}
 		ti++
 	}
+	return tagKeys
+}
+
+func hasSameKeys(keys []string, tags map[string]string) bool {
+	if len(keys) != len(tags) {
+		return false
+	}
+	for _, k := range keys {
+		if _, ok := tags[k]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func handleTableFormatValueFields(rsp *backend.DataResponse, valueFields data.Fields, tags map[string]string, columns []string) {
