@@ -64,6 +64,7 @@ func newQueryDataResponse(reader recordReader, query sqlutil.Query, headers meta
 	case sqlutil.FormatOptionTimeSeries:
 		if _, idx := frame.FieldByName("time"); idx == -1 {
 			resp.Error = fmt.Errorf("no time column found")
+			resp.ErrorSource = backend.ErrorSourceDownstream
 			return resp
 		}
 

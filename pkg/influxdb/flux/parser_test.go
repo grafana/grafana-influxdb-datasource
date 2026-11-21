@@ -99,16 +99,17 @@ func TestParseResponse(t *testing.T) {
 			wantErr:   "invalid state",
 		},
 		{
-			name: "stream error wins over parsed data",
+			name: "stream error is a downstream error that wins over parsed data",
 			result: &fakeTableResult{
 				rows: []fakeRow{
 					{tableChanged: true, metadata: simpleMetadata(), record: simpleRecord("a", 1)},
 				},
 				err: errors.New("stream torn down"),
 			},
-			query:     queryModel{MaxDataPoints: 100},
-			maxSeries: 10,
-			wantErr:   "stream torn down",
+			query:      queryModel{MaxDataPoints: 100},
+			maxSeries:  10,
+			wantErr:    "stream torn down",
+			wantSource: backend.ErrorSourceDownstream,
 		},
 		{
 			name: "max series exceeded is a downstream error",

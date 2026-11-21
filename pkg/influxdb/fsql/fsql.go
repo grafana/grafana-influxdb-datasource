@@ -108,7 +108,7 @@ func runQuery(ctx context.Context, c flightRunner, sql string) (*flightReader, *
 
 	reader, err := c.DoGetWithHeaderExtraction(ctx, info.Endpoint[0].Ticket)
 	if err != nil {
-		resp := backend.ErrDataResponse(backend.StatusInternal, fmt.Sprintf("flightsql: %s", err))
+		resp := errorResponse(err)
 		return nil, &resp
 	}
 	return reader, nil
