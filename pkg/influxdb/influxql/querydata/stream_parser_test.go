@@ -1,6 +1,7 @@
 package querydata
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/iotest"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/experimental"
@@ -146,5 +148,43 @@ func TestInfluxDBStreamingParser(t *testing.T) {
 		require.Nil(t, result.Frames)
 		require.EqualError(t, result.Error, "InfluxDB returned error: HTTP 200 OK: not json")
 		require.Equal(t, backend.ErrorSourceDownstream, result.ErrorSource)
+	})
+
+	t.Run("2xx body read error is wrapped beside the excerpt", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			body    string
+			cause   error
+			wantErr string
+		}{
+			{
+				name:    "body cut short",
+				body:    `{"results":[`,
+				cause:   io.ErrUnexpectedEOF,
+				wantErr: `unexpected EOF: {"results":[`,
+			},
+			{
+				name:    "timeout mid-body",
+				body:    `{"results":[`,
+				cause:   context.DeadlineExceeded,
+				wantErr: `context deadline exceeded: {"results":[`,
+			},
+			{
+				name:    "read fails before any bytes",
+				cause:   context.DeadlineExceeded,
+				wantErr: "context deadline exceeded",
+			},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				body := io.MultiReader(strings.NewReader(tc.body), iotest.ErrReader(tc.cause))
+				result := ResponseParse(io.NopCloser(body), 200, generateQuery("Test raw query", "time_series", ""))
+
+				require.Nil(t, result.Frames)
+				require.ErrorIs(t, result.Error, tc.cause)
+				require.EqualError(t, result.Error, tc.wantErr)
+				require.Equal(t, backend.ErrorSourceDownstream, result.ErrorSource)
+			})
+		}
 	})
 }
