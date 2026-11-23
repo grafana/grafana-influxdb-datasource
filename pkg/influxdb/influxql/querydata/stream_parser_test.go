@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/experimental"
 	"github.com/influxdata/influxql"
 	"github.com/stretchr/testify/require"
@@ -121,5 +122,29 @@ func TestInfluxDBStreamingParser(t *testing.T) {
 		result := ResponseParse(readJsonFile("invalid_response"), 400, generateQuery("Test raw query", "time_series", ""))
 		require.Nil(t, result.Frames)
 		require.EqualError(t, result.Error, "InfluxDB returned error: failed to parse query: found WERE, expected ; at line 1, char 38")
+	})
+
+	t.Run("non-JSON error response includes HTTP status and body excerpt", func(t *testing.T) {
+		result := ResponseParse(
+			io.NopCloser(strings.NewReader("<html>502 Bad Gateway</html>")),
+			502,
+			generateQuery("Test raw query", "time_series", ""),
+		)
+
+		require.Nil(t, result.Frames)
+		require.EqualError(t, result.Error, "InfluxDB returned error: HTTP 502 Bad Gateway: <html>502 Bad Gateway</html>")
+		require.Equal(t, backend.ErrorSourceFromHTTPStatus(502), result.ErrorSource)
+	})
+
+	t.Run("2xx non-JSON response is classified as downstream", func(t *testing.T) {
+		result := ResponseParse(
+			io.NopCloser(strings.NewReader("not json")),
+			200,
+			generateQuery("Test raw query", "time_series", ""),
+		)
+
+		require.Nil(t, result.Frames)
+		require.EqualError(t, result.Error, "InfluxDB returned error: HTTP 200 OK: not json")
+		require.Equal(t, backend.ErrorSourceDownstream, result.ErrorSource)
 	})
 }
