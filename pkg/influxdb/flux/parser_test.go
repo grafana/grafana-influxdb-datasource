@@ -2,10 +2,13 @@ package flux
 
 import (
 	"errors"
+	"io"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/influxdata/influxdb-client-go/v2/api"
 	"github.com/influxdata/influxdb-client-go/v2/api/query"
 	"github.com/stretchr/testify/require"
 )
@@ -50,6 +53,10 @@ func simpleMetadata() *query.FluxTableMetadata {
 	})
 }
 
+func csvResult(body string) tableResult {
+	return api.NewQueryTableResult(io.NopCloser(strings.NewReader(body)))
+}
+
 func simpleRecord(host string, value float64) *query.FluxRecord {
 	return query.NewFluxRecord(0, map[string]any{
 		"_time":  time.Date(2026, 7, 13, 0, 0, 0, 0, time.UTC),
@@ -61,7 +68,7 @@ func simpleRecord(host string, value float64) *query.FluxRecord {
 func TestParseResponse(t *testing.T) {
 	tests := []struct {
 		name       string
-		result     *fakeTableResult
+		result     tableResult
 		query      queryModel
 		maxSeries  int
 		wantFrames int
@@ -110,6 +117,50 @@ func TestParseResponse(t *testing.T) {
 			maxSeries:  10,
 			wantErr:    "stream torn down",
 			wantSource: backend.ErrorSourceDownstream,
+		},
+		{
+			name: "error row from InfluxDB is a downstream error",
+			result: csvResult("#datatype,string,string\n#group,true,true\n#default,,\n" +
+				",error,reference\n" +
+				",\"runtime error @1:1-1:30: from: bucket \"\"x\"\" not found\",\n"),
+			query:      queryModel{MaxDataPoints: 100},
+			maxSeries:  10,
+			wantErr:    `bucket "x" not found`,
+			wantSource: backend.ErrorSourceDownstream,
+		},
+		{
+			name: "number the client cannot decode is a plugin error",
+			result: csvResult("#datatype,string,long,double\n#group,false,false,false\n#default,_result,,\n" +
+				",result,table,_value\n" +
+				",,0,abc\n"),
+			query:     queryModel{MaxDataPoints: 100},
+			maxSeries: 10,
+			wantErr:   `strconv.ParseFloat: parsing "abc"`,
+		},
+		{
+			name: "time the client cannot decode is a plugin error",
+			result: csvResult("#datatype,string,long,dateTime:RFC3339\n#group,false,false,false\n#default,_result,,\n" +
+				",result,table,_time\n" +
+				",,0,yesterday\n"),
+			query:     queryModel{MaxDataPoints: 100},
+			maxSeries: 10,
+			wantErr:   `parsing time "yesterday"`,
+		},
+		{
+			name: "data type the client does not know is a plugin error",
+			result: csvResult("#datatype,string,long,decimal\n#group,false,false,false\n#default,_result,,\n" +
+				",result,table,_value\n" +
+				",,0,1.5\n"),
+			query:     queryModel{MaxDataPoints: 100},
+			maxSeries: 10,
+			wantErr:   "_value has unknown data type decimal",
+		},
+		{
+			name:      "CSV without annotations is a plugin error",
+			result:    csvResult(",result,table,_value\n,_result,0,1\n"),
+			query:     queryModel{MaxDataPoints: 100},
+			maxSeries: 10,
+			wantErr:   "parsing error, annotations not found",
 		},
 		{
 			name: "max series exceeded is a downstream error",
