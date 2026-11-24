@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/experimental"
 	"github.com/influxdata/influxql"
 	"github.com/stretchr/testify/require"
@@ -147,4 +148,48 @@ func TestInfluxDBStreamingParser(t *testing.T) {
 		require.EqualError(t, result.Error, "InfluxDB returned error: HTTP 200 OK: not json")
 		require.Equal(t, backend.ErrorSourceDownstream, result.ErrorSource)
 	})
+}
+
+func TestStreamingParserTableFormatTagColumns(t *testing.T) {
+	var series []string
+	for i := range 20 {
+		series = append(series, fmt.Sprintf(`{"name":"cpu","tags":{"host":"h%d","region":"r%d"},"columns":["time","mean"],"values":[[%d,1.5]]}`, i, i, 1000*(i+1)))
+	}
+	body := `{"results":[{"statement_id":0,"series":[` + strings.Join(series, ",") + `]}]}`
+
+	rsp := ResponseParse(io.NopCloser(strings.NewReader(body)), 200, generateQuery("Test raw query", "table", ""))
+
+	require.NoError(t, rsp.Error)
+	require.Len(t, rsp.Frames, 1)
+	frame := rsp.Frames[0]
+	host, _ := frame.FieldByName("host")
+	region, _ := frame.FieldByName("region")
+	require.NotNil(t, host)
+	require.NotNil(t, region)
+	require.Equal(t, 20, frame.Rows())
+	for i := range 20 {
+		require.Equal(t, fmt.Sprintf("h%d", i), *host.At(i).(*string), "host in row %d", i)
+		require.Equal(t, fmt.Sprintf("r%d", i), *region.At(i).(*string), "region in row %d", i)
+	}
+}
+
+func TestStreamingParserStatementError(t *testing.T) {
+	body := `{"results":[{"statement_id":0,"error":"database not found: mydb"}]}`
+	for _, format := range []string{"time_series", "table", "logs"} {
+		t.Run(format, func(t *testing.T) {
+			rsp := ResponseParse(io.NopCloser(strings.NewReader(body)), 200, generateQuery("Test raw query", format, ""))
+
+			require.EqualError(t, rsp.Error, "database not found: mydb")
+			require.Equal(t, backend.ErrorSourceDownstream, rsp.ErrorSource)
+			require.Empty(t, rsp.Frames)
+		})
+	}
+}
+
+func TestStreamingParserTopLevelErrorIsDownstream(t *testing.T) {
+	rsp := ResponseParse(readJsonFile("error_on_top_level_response"), 200, generateQuery("Test raw query", "time_series", ""))
+
+	require.EqualError(t, rsp.Error, "error parsing query: found THING")
+	require.Equal(t, backend.ErrorSourceDownstream, rsp.ErrorSource)
+	require.Equal(t, data.Frames(nil), rsp.Frames)
 }
