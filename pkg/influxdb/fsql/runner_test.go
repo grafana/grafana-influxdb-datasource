@@ -3,6 +3,7 @@ package fsql
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 
 	"github.com/apache/arrow-go/v18/arrow/flight"
@@ -92,6 +93,13 @@ func TestRunQueryErrorPaths(t *testing.T) {
 			client:     &fakeFlightClient{executeInfo: oneEndpoint, doGetErr: errors.New("stream refused")},
 			wantStatus: backend.StatusInternal,
 			wantErr:    "stream refused",
+		},
+		{
+			name:       "doget grpc error maps to its status downstream",
+			client:     &fakeFlightClient{executeInfo: oneEndpoint, doGetErr: status.Error(codes.Unavailable, "connection lost")},
+			wantStatus: backend.Status(http.StatusServiceUnavailable),
+			wantSource: backend.ErrorSourceDownstream,
+			wantErr:    "connection lost",
 		},
 	}
 

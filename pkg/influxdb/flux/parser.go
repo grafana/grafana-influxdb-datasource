@@ -3,7 +3,9 @@ package flux
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
@@ -97,6 +99,19 @@ func readDataFrames(logger log.Logger, result tableResult, maxPoints int, maxSer
 	// result.Err() is probably more important then the other errors
 	if result.Err() != nil {
 		dr.Error = result.Err()
+		if !isClientDecodeError(dr.Error) {
+			dr.ErrorSource = backend.ErrorSourceDownstream
+		}
 	}
 	return dr
+}
+
+// isClientDecodeError reports whether err is influxdb-client-go failing to decode the annotated CSV.
+// The client returns its structural and data type errors untyped, so those match on the message.
+func isClientDecodeError(err error) bool {
+	var numErr *strconv.NumError
+	var timeErr *time.ParseError
+	msg := err.Error()
+	return errors.As(err, &numErr) || errors.As(err, &timeErr) ||
+		strings.HasPrefix(msg, "parsing error") || strings.Contains(msg, "has unknown data type")
 }

@@ -45,7 +45,7 @@ type Executor struct {
 func NewExecutor(ctx context.Context, tracer trace.Tracer, dsInfo *models.DatasourceInfo) (*Executor, error) {
 	var parse responseParser = buffered.ResponseParse
 	if config.GrafanaConfigFromContext(ctx).FeatureToggles().IsEnabled("influxqlStreamingParser") {
-		glog.FromContext(ctx).Info("InfluxDB InfluxQL streaming parser enabled: ", "info")
+		glog.FromContext(ctx).Debug("InfluxQL streaming parser enabled")
 		parse = querydata.ResponseParse
 	}
 	return &Executor{
