@@ -118,15 +118,23 @@ func TestParsingAsTimeSeriesWithoutTimeColumn(t *testing.T) {
 }
 
 func TestInfluxdbResponseParser(t *testing.T) {
-	t.Run("Influxdb response parser should handle invalid JSON", func(t *testing.T) {
-		result := ResponseParse(
-			io.NopCloser(strings.NewReader(`{ invalid }`)),
-			200,
-			generateQuery("Test raw query", "time_series", ""),
-		)
+	t.Run("Influxdb response parser reports an undecodable 2xx body as a downstream error", func(t *testing.T) {
+		for name, body := range map[string]string{
+			"invalid JSON": `{ invalid }`,
+			"empty body":   ``,
+		} {
+			t.Run(name, func(t *testing.T) {
+				result := ResponseParse(
+					io.NopCloser(strings.NewReader(body)),
+					200,
+					generateQuery("Test raw query", "time_series", ""),
+				)
 
-		require.Nil(t, result.Frames)
-		require.Error(t, result.Error)
+				require.Nil(t, result.Frames)
+				require.Error(t, result.Error)
+				require.Equal(t, backend.ErrorSourceDownstream, result.ErrorSource)
+			})
+		}
 	})
 
 	t.Run("Influxdb response parser with alias", func(t *testing.T) {

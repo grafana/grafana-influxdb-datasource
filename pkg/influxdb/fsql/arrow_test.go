@@ -220,6 +220,19 @@ func TestNewQueryDataResponse_Error(t *testing.T) {
 	assert.Equal(t, fmt.Errorf("explosion!"), resp.Error)
 }
 
+func TestNewQueryDataResponse_TimeSeriesWithoutTimeColumn(t *testing.T) {
+	schema := arrow.NewSchema([]arrow.Field{{Name: "value", Type: arrow.PrimitiveTypes.Float64}}, nil)
+	values, _, err := array.FromJSON(memory.DefaultAllocator, &arrow.Float64Type{}, strings.NewReader(`[1.1]`))
+	assert.NoError(t, err)
+	reader, err := array.NewRecordReader(schema, []arrow.RecordBatch{array.NewRecordBatch(schema, []arrow.Array{values}, -1)})
+	assert.NoError(t, err)
+
+	resp := newQueryDataResponse(reader, sqlutil.Query{Format: sqlutil.FormatOptionTimeSeries}, metadata.MD{})
+
+	assert.EqualError(t, resp.Error, "no time column found")
+	assert.Equal(t, backend.ErrorSourceDownstream, resp.ErrorSource)
+}
+
 func TestNewQueryDataResponse_WideTable(t *testing.T) {
 	alloc := memory.DefaultAllocator
 	schema := arrow.NewSchema(
