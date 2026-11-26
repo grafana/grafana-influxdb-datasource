@@ -54,6 +54,21 @@ This project adheres to the [Grafana Code of Conduct](https://github.com/grafana
    mage -v
    ```
 
+## Data source configuration schema
+
+Edit `pkg/schema/dsconfig.json` when a setting changes. Update its storage key, type, editor group, conditions, and examples as needed. Keep the schema URL pinned to the `github.com/grafana/dsconfig/dsconfig` version in `go.mod`.
+
+The conformance test in `pkg/schema/dsconfig_test.go` uses `models.DatasourceInfo` from `pkg/influxdb/models/datasource_info.go`, the model that `NewDatasource` reads. Update the test's additional fields for settings read by Grafana, the SDK, or the frontend. Update `SecureKeys` for secrets and the configuration examples for affected connection modes.
+
+From the repository root, run:
+
+```shell
+go generate ./pkg/schema/...
+go test ./pkg/schema/...
+```
+
+The generated files are `pkg/schema/schema.gen.json`, `pkg/schema/settings.gen.json`, and `pkg/schema/settings.examples.gen.json`. Include them with the schema change. The production build (`npm run build`) copies all four schema files into `dist/schema/`.
+
 ## Local development environment
 
 `npm run server` starts a local InfluxDB instance and a Grafana instance with the plugin pre-provisioned:

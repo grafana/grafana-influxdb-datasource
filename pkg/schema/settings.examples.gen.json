@@ -1,0 +1,317 @@
+{
+  "examples": {
+    "flux": {
+      "summary": "Flux with an InfluxDB 2.x API token",
+      "value": {
+        "apiVersion": "influxdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "flux"
+        },
+        "secure": {
+          "token": {
+            "create": "\u003ctoken\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "defaultBucket": "bucket",
+            "organization": "organization",
+            "product": "InfluxDB OSS 2.x",
+            "version": "Flux"
+          },
+          "title": "Flux with an InfluxDB 2.x API token",
+          "url": "http://localhost:8086"
+        }
+      }
+    },
+    "flux-1-8": {
+      "summary": "Flux with InfluxDB 1.8 database credentials",
+      "value": {
+        "apiVersion": "influxdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "flux-1-8"
+        },
+        "secure": {
+          "token": {
+            "create": "\u003cuser\u003e:\u003cpassword\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "defaultBucket": "site/autogen",
+            "organization": "organization",
+            "product": "InfluxDB OSS 1.x",
+            "version": "Flux"
+          },
+          "title": "Flux with InfluxDB 1.8 database credentials",
+          "url": "http://localhost:8086"
+        }
+      }
+    },
+    "influxql": {
+      "summary": "InfluxQL without authentication",
+      "value": {
+        "apiVersion": "influxdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "influxql"
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "dbName": "site",
+            "product": "InfluxDB OSS 1.x",
+            "version": "InfluxQL"
+          },
+          "title": "InfluxQL without authentication",
+          "url": "http://localhost:8086"
+        }
+      }
+    },
+    "influxql-client-cert": {
+      "summary": "InfluxQL with TLS client authentication and a private CA",
+      "value": {
+        "apiVersion": "influxdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "influxql-client-cert"
+        },
+        "secure": {
+          "tlsCACert": {
+            "create": "\u003cPEM CA certificate\u003e"
+          },
+          "tlsClientCert": {
+            "create": "\u003cPEM client certificate\u003e"
+          },
+          "tlsClientKey": {
+            "create": "\u003cPEM private key\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "dbName": "site",
+            "product": "InfluxDB OSS 1.x",
+            "tlsAuth": true,
+            "tlsAuthWithCACert": true,
+            "version": "InfluxQL"
+          },
+          "title": "InfluxQL with TLS client authentication and a private CA",
+          "url": "https://localhost:8086"
+        }
+      }
+    },
+    "influxql-http-basic": {
+      "summary": "InfluxQL with HTTP basic authentication",
+      "value": {
+        "apiVersion": "influxdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "influxql-http-basic"
+        },
+        "secure": {
+          "basicAuthPassword": {
+            "create": "\u003cpassword\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "basicAuth": true,
+          "basicAuthUser": "grafana",
+          "jsonData": {
+            "dbName": "site",
+            "product": "InfluxDB OSS 1.x",
+            "version": "InfluxQL"
+          },
+          "title": "InfluxQL with HTTP basic authentication",
+          "url": "https://localhost:8086"
+        }
+      }
+    },
+    "influxql-oauth": {
+      "summary": "InfluxQL with the querying user's OAuth identity",
+      "value": {
+        "apiVersion": "influxdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "influxql-oauth"
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "dbName": "site",
+            "oauthPassThru": true,
+            "product": "InfluxDB OSS 1.x",
+            "version": "InfluxQL"
+          },
+          "title": "InfluxQL with the querying user's OAuth identity",
+          "url": "https://localhost:8086"
+        }
+      }
+    },
+    "influxql-password": {
+      "summary": "InfluxQL with database credentials",
+      "value": {
+        "apiVersion": "influxdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "influxql-password"
+        },
+        "secure": {
+          "password": {
+            "create": "\u003cpassword\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "dbName": "site",
+            "httpMode": "GET",
+            "product": "InfluxDB OSS 1.x",
+            "version": "InfluxQL"
+          },
+          "title": "InfluxQL with database credentials",
+          "url": "http://localhost:8086",
+          "user": "grafana"
+        }
+      }
+    },
+    "influxql-token": {
+      "summary": "InfluxQL with an InfluxDB 2.x API token",
+      "value": {
+        "apiVersion": "influxdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "influxql-token"
+        },
+        "secure": {
+          "httpHeaderValue1": {
+            "create": "Token \u003ctoken\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "dbName": "site",
+            "httpHeaderName1": "Authorization",
+            "product": "InfluxDB OSS 2.x",
+            "version": "InfluxQL"
+          },
+          "title": "InfluxQL with an InfluxDB 2.x API token",
+          "url": "http://localhost:8086"
+        }
+      }
+    },
+    "sql": {
+      "summary": "Flight SQL with a database token over TLS",
+      "value": {
+        "apiVersion": "influxdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "sql"
+        },
+        "secure": {
+          "token": {
+            "create": "\u003capi-token\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "dbName": "site",
+            "product": "InfluxDB OSS 3.x",
+            "version": "SQL"
+          },
+          "title": "Flight SQL with a database token over TLS",
+          "url": "https://localhost:8086"
+        }
+      }
+    },
+    "sql-pdc": {
+      "summary": "Flight SQL through a Grafana Cloud PDC agent using a private CA",
+      "value": {
+        "apiVersion": "influxdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "sql-pdc"
+        },
+        "secure": {
+          "tlsCACert": {
+            "create": "\u003cPEM CA certificate\u003e"
+          },
+          "token": {
+            "create": "\u003capi-token\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "dbName": "site",
+            "enableSecureSocksProxy": true,
+            "product": "InfluxDB OSS 3.x",
+            "secureSocksProxyUsername": "\u003cprivate-network-id\u003e",
+            "tlsAuthWithCACert": true,
+            "version": "SQL"
+          },
+          "title": "Flight SQL through a Grafana Cloud PDC agent using a private CA",
+          "url": "https://influxdb3:8443"
+        }
+      }
+    },
+    "sql-plaintext": {
+      "summary": "Flight SQL on a plaintext server with authentication disabled",
+      "value": {
+        "apiVersion": "influxdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "sql-plaintext"
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "dbName": "fixtures",
+            "insecureGrpc": true,
+            "product": "InfluxDB OSS 3.x",
+            "version": "SQL"
+          },
+          "title": "Flight SQL on a plaintext server with authentication disabled",
+          "url": "http://influxdb3:8181"
+        }
+      }
+    },
+    "sql-socks-proxy": {
+      "summary": "Flight SQL through a SOCKS5 proxy with username and password",
+      "value": {
+        "apiVersion": "influxdb.datasource.grafana.app/v0alpha1",
+        "kind": "DataSource",
+        "metadata": {
+          "name": "sql-socks-proxy"
+        },
+        "secure": {
+          "secureSocksProxyPassword": {
+            "create": "\u003cproxy-password\u003e"
+          },
+          "token": {
+            "create": "\u003capi-token\u003e"
+          }
+        },
+        "spec": {
+          "access": "proxy",
+          "jsonData": {
+            "dbName": "site",
+            "enableSecureSocksProxy": true,
+            "product": "InfluxDB OSS 3.x",
+            "secureSocksProxyUsername": "\u003cproxy-user\u003e",
+            "version": "SQL"
+          },
+          "title": "Flight SQL through a SOCKS5 proxy with username and password",
+          "url": "https://influxdb3:8443"
+        }
+      }
+    }
+  }
+}

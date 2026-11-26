@@ -1,0 +1,237 @@
+{
+  "spec": {
+    "type": "object",
+    "required": [
+      "url"
+    ],
+    "properties": {
+      "access": {
+        "description": "Send requests through the Grafana server.",
+        "type": "string",
+        "default": "proxy",
+        "enum": [
+          "proxy"
+        ]
+      },
+      "basicAuth": {
+        "description": "Enable HTTP Basic authentication. When enabled, the SDK populates `httpclient.Options.BasicAuth` from `basicAuthUser` / `secureJsonData.basicAuthPassword`.",
+        "type": "boolean",
+        "default": false
+      },
+      "basicAuthUser": {
+        "description": "Username sent with HTTP basic authentication.",
+        "type": "string",
+        "x-dsconfig-depends-on": "plugin_sdk_settings.basicAuth == true",
+        "x-dsconfig-required-when": "plugin_sdk_settings.basicAuth == true"
+      },
+      "database": {
+        "description": "Fallback database name for existing configurations without jsonData.dbName.",
+        "type": "string",
+        "x-dsconfig-depends-on": "false"
+      },
+      "jsonData": {
+        "type": "object",
+        "properties": {
+          "dbName": {
+            "description": "Database to query with InfluxQL or Flight SQL. For InfluxQL on 2.x, use the database name in the DBRP mapping.",
+            "type": "string",
+            "x-dsconfig-depends-on": "jsonData_version == 'InfluxQL' || jsonData_version == 'SQL'",
+            "x-dsconfig-required-when": "(jsonData_version == 'InfluxQL' || jsonData_version == 'SQL') \u0026\u0026 (root_database == null || root_database == '')"
+          },
+          "defaultBucket": {
+            "description": "Bucket used by the v.defaultBucket macro in Flux queries.",
+            "type": "string",
+            "x-dsconfig-depends-on": "jsonData_version == 'Flux'",
+            "x-dsconfig-required-when": "jsonData_version == 'Flux'"
+          },
+          "enableSecureSocksProxy": {
+            "description": "Route connections through the secure SOCKS proxy configured on the Grafana server.",
+            "type": "boolean",
+            "default": false
+          },
+          "httpHeaders": {
+            "description": "Headers sent with HTTP requests. Store each name in jsonData.httpHeaderName\u003cN\u003e and its value in secureJsonData.httpHeaderValue\u003cN\u003e, starting at 1.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9-]*$"
+                },
+                "value": {
+                  "type": "string"
+                }
+              }
+            },
+            "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+          },
+          "httpMode": {
+            "description": "HTTP method used for InfluxQL queries. POST carries the query in the request body.",
+            "type": "string",
+            "default": "GET",
+            "enum": [
+              "GET",
+              "POST"
+            ],
+            "x-dsconfig-depends-on": "jsonData_version == 'InfluxQL'"
+          },
+          "insecureGrpc": {
+            "description": "Use plaintext gRPC to connect to a Flight SQL server.",
+            "type": "boolean",
+            "default": false,
+            "x-dsconfig-depends-on": "jsonData_version == 'SQL'"
+          },
+          "keepCookies": {
+            "description": "Cookies, by name, that the Grafana proxy should forward to the datasource. The Grafana proxy strips all cookies by default.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "x-dsconfig-depends-on": "plugin_sdk_settings.access == 'proxy'"
+          },
+          "maxSeries": {
+            "description": "Maximum number of series or tables returned by a Flux query. Use a whole number. Zero uses the default of 1000.",
+            "type": "number",
+            "default": 1000,
+            "x-dsconfig-depends-on": "jsonData_version != ''"
+          },
+          "oauthPassThru": {
+            "description": "Forward the signed-in user’s OAuth identity on HTTP requests. For OAuth-only authentication, omit the database user and password.",
+            "type": "boolean",
+            "default": false,
+            "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+          },
+          "organization": {
+            "description": "Organization required for every Flux connection, including InfluxDB 1.8. Flux queries also use it for the v.organization macro.",
+            "type": "string",
+            "x-dsconfig-depends-on": "jsonData_version == 'Flux'",
+            "x-dsconfig-required-when": "jsonData_version == 'Flux'"
+          },
+          "pdcInjected": {
+            "description": "Grafana sets this flag to show the Private Data Source Connect entry in the settings sidebar.",
+            "type": "boolean",
+            "x-dsconfig-depends-on": "false"
+          },
+          "product": {
+            "description": "InfluxDB product used to select the available query languages. The editor can identify it from the URL or the server response.",
+            "type": "string",
+            "enum": [
+              "InfluxDB Cloud Dedicated",
+              "InfluxDB Cloud Serverless",
+              "InfluxDB Clustered",
+              "InfluxDB Enterprise 1.x",
+              "InfluxDB Enterprise 3.x",
+              "InfluxDB Cloud (TSM)",
+              "InfluxDB Cloud 1",
+              "InfluxDB OSS 1.x",
+              "InfluxDB OSS 2.x",
+              "InfluxDB OSS 3.x"
+            ]
+          },
+          "secureSocksProxyUsername": {
+            "description": "SOCKS5 username. Defaults to the data source UID. For a Grafana Cloud PDC agent, use the ID of the private network selected from the networks in your stack.",
+            "type": "string",
+            "x-dsconfig-depends-on": "jsonData_enableSecureSocksProxy == true"
+          },
+          "serverName": {
+            "description": "Server name used to verify the certificate on HTTP connections.",
+            "type": "string",
+            "x-dsconfig-depends-on": "plugin_sdk_settings.tlsAuth == true"
+          },
+          "showTagTime": {
+            "description": "Time range applied to InfluxQL tag autocomplete queries.",
+            "type": "string",
+            "x-dsconfig-depends-on": "jsonData_version == 'InfluxQL'"
+          },
+          "timeInterval": {
+            "description": "Lower limit for the automatic query interval, such as 10s.",
+            "type": "string",
+            "x-dsconfig-depends-on": "jsonData_version == 'InfluxQL' || jsonData_version == 'Flux'"
+          },
+          "timeout": {
+            "description": "Timeout in whole seconds for HTTP requests and for connecting to the secure SOCKS proxy.",
+            "type": "number",
+            "default": 30,
+            "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+          },
+          "tlsAuth": {
+            "description": "Present a client certificate on HTTP connections.",
+            "type": "boolean",
+            "default": false,
+            "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+          },
+          "tlsAuthWithCACert": {
+            "description": "Trust a custom certificate authority for TLS connections.",
+            "type": "boolean",
+            "default": false,
+            "x-dsconfig-depends-on": "plugin_sdk_settings.access == 'proxy'"
+          },
+          "tlsSkipVerify": {
+            "description": "Skip verification of the server certificate for HTTP requests.",
+            "type": "boolean",
+            "default": false,
+            "x-dsconfig-depends-on": "plugin_sdk_settings.access != 'direct'"
+          },
+          "version": {
+            "description": "Query language to use for this data source. Defaults to InfluxQL when omitted.",
+            "type": "string",
+            "default": "InfluxQL",
+            "enum": [
+              "InfluxQL",
+              "SQL",
+              "Flux"
+            ]
+          }
+        }
+      },
+      "url": {
+        "description": "Base URL of the InfluxDB server. For SQL, include the Flight SQL port if it differs from 443.",
+        "type": "string"
+      },
+      "user": {
+        "description": "Database username for InfluxQL password authentication. It also enables HTTP Basic fallback when no OAuth token is forwarded. Omit it for OAuth-only or unauthenticated connections.",
+        "type": "string",
+        "x-dsconfig-depends-on": "jsonData_version == 'InfluxQL'"
+      },
+      "withCredentials": {
+        "description": "Whether credentials such as cookies or auth headers should be sent with cross-site requests.",
+        "type": "boolean",
+        "default": false
+      }
+    }
+  },
+  "secureValues": [
+    {
+      "key": "basicAuthPassword",
+      "description": "Password sent with HTTP basic authentication."
+    },
+    {
+      "key": "tlsCACert",
+      "description": "PEM-encoded CA certificate used to verify the server certificate."
+    },
+    {
+      "key": "tlsClientCert",
+      "description": "PEM-encoded client certificate sent to the HTTP server."
+    },
+    {
+      "key": "tlsClientKey",
+      "description": "PEM-encoded private key for the HTTP client certificate."
+    },
+    {
+      "key": "password",
+      "description": "Password paired with the InfluxQL database user. Omit it for OAuth-only or unauthenticated connections."
+    },
+    {
+      "key": "token",
+      "description": "Flux API token, or username:password for Flux on 1.8. Flight SQL sends any nonempty token as a Bearer credential. Omit it when the SQL server has authentication disabled."
+    },
+    {
+      "key": "secureSocksProxyPassword",
+      "description": "SOCKS5 password if the proxy requires one. Omit it for a PDC agent network."
+    }
+  ]
+}
