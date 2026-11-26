@@ -229,7 +229,7 @@
       },
       {
         "key": "token",
-        "description": "Flux API token, or username:password for Flux on 1.8. Flight SQL sends any nonempty token as a Bearer credential. Omit it when the SQL server has authentication disabled."
+        "description": "Required for Flux. Use an API token on InfluxDB 2.x or username:password on 1.8. Flight SQL sends the token as a Bearer credential. The SQL editor requires a token when validation is enabled. Provisioning can omit it if the server allows unauthenticated connections."
       },
       {
         "key": "secureSocksProxyPassword",
